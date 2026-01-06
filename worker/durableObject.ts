@@ -1,19 +1,22 @@
 import { DurableObject } from "cloudflare:workers";
-import type { Article, Feed, DemoItem } from '@shared/types';
+import type { Article, Feed } from '@shared/types';
 import { MOCK_ARTICLES, MOCK_FEEDS } from '@shared/mock-data';
 export class GlobalDurableObject extends DurableObject {
-    // Article Management
+    // Article Management & Global Deduplication
     async getArticles(): Promise<Article[]> {
         const items = await this.ctx.storage.get("articles");
         if (items) return items as Article[];
         await this.ctx.storage.put("articles", MOCK_ARTICLES);
         return MOCK_ARTICLES;
     }
-    async addArticle(article: Article): Promise<Article[]> {
-        const items = await this.getArticles();
-        const updated = [article, ...items].slice(0, 1000);
+    async ingestBatch(articles: Article[]): Promise<void> {
+        const current = await this.getArticles();
+        const currentHashes = new Set(current.map(a => a.hash));
+        const newArticles = articles.filter(a => !currentHashes.has(a.hash));
+        if (newArticles.length === 0) return;
+        // Keep global pool at 1000 items
+        const updated = [...newArticles, ...current].slice(0, 1000);
         await this.ctx.storage.put("articles", updated);
-        return updated;
     }
     // Feed Management
     async getFeeds(): Promise<Feed[]> {
@@ -34,12 +37,31 @@ export class GlobalDurableObject extends DurableObject {
         await this.ctx.storage.put("feeds", updated);
         return updated;
     }
+    // Quality Consensus Voting
+    async voteQuality(feedUrl: string, score: number): Promise<void> {
+        const key = `votes_${feedUrl}`;
+        const data: { total: number; count: number } = (await this.ctx.storage.get(key)) || { total: 0, count: 0 };
+        // Simple moving average components
+        data.total += score;
+        data.count += 1;
+        await this.ctx.storage.put(key, data);
+    }
+    async getGlobalStats(feedUrl: string): Promise<any> {
+        const voteKey = `votes_${feedUrl}`;
+        const voteData: { total: number; count: number } = (await this.ctx.storage.get(voteKey)) || { total: 0, count: 0 };
+        const consensus = voteData.count > 0 ? Math.round(voteData.total / voteData.count) : null;
+        return {
+            consensusScore: consensus,
+            totalVotes: voteData.count,
+            lastUpdated: Date.now()
+        };
+    }
     // Telemetry & Network Stats
     async recordTelemetryBatch(events: any[]): Promise<void> {
         const date = new Date().toISOString().split('T')[0];
         const key = `telemetry_${date}`;
         const existing: any[] = (await this.ctx.storage.get(key)) || [];
-        const updated = [...existing, ...events].slice(-2000); // Keep last 2k events per day
+        const updated = [...existing, ...events].slice(-2000);
         await this.ctx.storage.put(key, updated);
     }
     async getNetworkStats(): Promise<any> {
@@ -64,7 +86,7 @@ export class GlobalDurableObject extends DurableObject {
     }
     async getOffer(targetNodeId: string): Promise<any> {
         const offer: any = await this.ctx.storage.get(`offer_${targetNodeId}`);
-        if (offer && Date.now() - offer.createdAt > 300000) { // 5 min TTL
+        if (offer && Date.now() - offer.createdAt > 300000) {
             await this.ctx.storage.delete(`offer_${targetNodeId}`);
             return null;
         }

@@ -3,6 +3,7 @@ import { Env } from './core-utils';
 import type { Article, Feed } from '@shared/types';
 export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const getStub = (c: any) => c.env.GlobalDurableObject.get(c.env.GlobalDurableObject.idFromName("global"));
+    // Articles & Feeds
     app.get('/api/articles', async (c) => {
         const data = await getStub(c).getArticles();
         return c.json({ success: true, data });
@@ -11,11 +12,25 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         const data = await getStub(c).getFeeds();
         return c.json({ success: true, data });
     });
-    app.post('/api/feeds', async (c) => {
-        const feed = await c.req.json() as Feed;
-        const data = await getStub(c).addFeed(feed);
-        return c.json({ success: true, data });
+    // Distributed Signaling
+    app.post('/api/signal/ingest', async (c) => {
+        const articles = await c.req.json() as Article[];
+        await getStub(c).ingestBatch(articles);
+        return c.json({ success: true });
     });
+    app.post('/api/signal/vote', async (c) => {
+        const { feedUrl, score } = await c.req.json();
+        const nodeId = c.req.header('x-node-id');
+        if (!nodeId) return c.json({ success: false, error: 'Node ID required' }, 401);
+        await getStub(c).voteQuality(feedUrl, score);
+        return c.json({ success: true });
+    });
+    app.get('/api/signal/stats/:feedUrl', async (c) => {
+        const feedUrl = decodeURIComponent(c.req.param('feedUrl'));
+        const stats = await getStub(c).getGlobalStats(feedUrl);
+        return c.json({ success: true, data: stats });
+    });
+    // Core Proxy & Telemetry
     app.get('/api/proxy', async (c) => {
         const url = c.req.query('url');
         if (!url) return c.json({ success: false, error: 'URL required' }, 400);

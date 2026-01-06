@@ -21,6 +21,11 @@ export interface UserSetting {
   key: string;
   value: any;
 }
+export interface VoteRecord {
+  feedUrl: string;
+  lastVoted: number;
+  score: number;
+}
 export class ValleyHubDB extends Dexie {
   articles!: Table<Article>;
   feeds!: Table<Feed>;
@@ -28,6 +33,7 @@ export class ValleyHubDB extends Dexie {
   config!: Table<AppConfig>;
   telemetry!: Table<TelemetryEvent>;
   settings!: Table<UserSetting>;
+  votes!: Table<VoteRecord>;
   constructor() {
     super('ValleyHubDB');
     this.version(1).stores({
@@ -39,6 +45,9 @@ export class ValleyHubDB extends Dexie {
     this.version(2).stores({
       telemetry: '++id, event, timestamp, synced',
       settings: 'key'
+    });
+    this.version(3).stores({
+      votes: 'feedUrl, lastVoted'
     });
   }
 }

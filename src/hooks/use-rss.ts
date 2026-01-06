@@ -3,9 +3,6 @@ import { XMLParser } from 'fast-xml-parser';
 import { db } from '@/lib/db';
 import type { Article } from '@shared/types';
 import { v4 as uuidv4 } from 'uuid';
-/**
- * Generates a stable hash for a string without crashing on Unicode/Emoji
- */
 async function generateSafeHash(input: string): Promise<string> {
   const msgUint8 = new TextEncoder().encode(input);
   const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
@@ -18,6 +15,7 @@ export function useRSS() {
   const syncFeeds = async () => {
     setIsSyncing(true);
     setError(null);
+    const discoveredArticles: Article[] = [];
     try {
       const feeds = await db.feeds.toArray();
       if (feeds.length === 0) return;
@@ -31,13 +29,11 @@ export function useRSS() {
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const xmlText = await response.text();
           const jsonObj = parser.parse(xmlText);
-          // Handle both RSS 2.0 and Atom structures
           const channel = jsonObj.rss?.channel;
           const atomFeed = jsonObj.feed;
           const items = channel?.item || atomFeed?.entry || [];
           const normalizedItems = await Promise.all((Array.isArray(items) ? items : [items]).map(async (item: any) => {
             const title = item.title?.["#text"] || item.title || 'No title';
-            // Link detection for Atom vs RSS
             let link = "";
             if (typeof item.link === 'string') link = item.link;
             else if (Array.isArray(item.link)) {
@@ -49,14 +45,11 @@ export function useRSS() {
               link = item.guid["#text"];
             }
             const description = item.description || item.summary?.["#text"] || item.summary || item.content?.["#text"] || item.content || '';
-            // Robust date parsing
             let pubDate = new Date().toISOString();
             const rawDate = item.pubDate || item.published || item.updated || item["dc:date"];
             if (rawDate) {
               const parsed = new Date(rawDate);
-              if (!isNaN(parsed.getTime())) {
-                pubDate = parsed.toISOString();
-              }
+              if (!isNaN(parsed.getTime())) pubDate = parsed.toISOString();
             }
             const hash = await generateSafeHash(title + link);
             return {
@@ -66,17 +59,17 @@ export function useRSS() {
               link: typeof link === 'string' ? link : String(link),
               description: typeof description === 'string' ? description : (description?.["#text"] || ''),
               pubDate,
-              feedUrl: feed.id,
+              feedUrl: feed.xmlUrl, // Use URL for signaling lookup
               category: feed.category,
               sourceName: feed.title,
               isBookmarked: false,
             } as Article;
           }));
-          // Bulk deduplication and storage
           for (const article of normalizedItems) {
             const existing = await db.articles.where('hash').equals(article.hash).first();
             if (!existing) {
               await db.articles.add(article);
+              discoveredArticles.push(article);
             }
           }
           await db.feeds.update(feed.id, { lastFetched: new Date().toISOString() });
@@ -84,6 +77,14 @@ export function useRSS() {
           console.error(`Failed to fetch feed ${feed.title}:`, e);
         }
         await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      // Signal discovered articles to the global mesh
+      if (discoveredArticles.length > 0) {
+        await fetch('/api/signal/ingest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(discoveredArticles.slice(0, 50)) // Limit batch size
+        }).catch(err => console.error('Signaling failed:', err));
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown sync error');
