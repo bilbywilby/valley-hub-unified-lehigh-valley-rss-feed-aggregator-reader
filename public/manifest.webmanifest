@@ -1,0 +1,35 @@
+{
+  "name": "Valley Hub",
+  "short_name": "ValleyHub",
+  "description": "Unified Lehigh Valley RSS Feed Aggregator & Reader",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020205",
+  "theme_color": "#F38020",
+  "icons": [
+    {
+      "src": "https://images.unsplash.com/photo-1585829365294-bb8c8f771bbd?q=80&w=192&h=192&auto=format&fit=crop",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1585829365294-bb8c8f771bbd?q=80&w=512&h=512&auto=format&fit=crop",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Manage Feeds",
+      "url": "/feeds",
+      "icons": [{ "src": "https://images.unsplash.com/photo-1585829365294-bb8c8f771bbd?q=80&w=96&h=96&auto=format&fit=crop", "sizes": "96x96" }]
+    },
+    {
+      "name": "Telemetry",
+      "url": "/telemetry",
+      "icons": [{ "src": "https://images.unsplash.com/photo-1585829365294-bb8c8f771bbd?q=80&w=96&h=96&auto=format&fit=crop", "sizes": "96x96" }]
+    }
+  ]
+}
