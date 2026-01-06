@@ -26,7 +26,7 @@ export function ArticleDetailPage() {
         category: article.category
       });
       let isMounted = true;
-      // Fetch source trust data
+      // Fetch source trust data from mesh
       fetch(`/api/signal/stats/${encodeURIComponent(article.feedUrl)}`)
         .then(res => res.json())
         .then(json => {
@@ -41,7 +41,7 @@ export function ArticleDetailPage() {
         isMounted = false;
       };
     }
-  }, [articleId, hasArticle, trackEvent]); // Stable dependencies
+  }, [article, articleId, hasArticle, trackEvent]); // Added 'article' to satisfy lint and ensure fresh state
   const sanitizedContent = useMemo(() => {
     if (!article?.description) return '';
     return article.description.replace(/<style([\s\S]*?)<\/style>/gi, '')

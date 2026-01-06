@@ -59,7 +59,7 @@ export function useRSS() {
               link: typeof link === 'string' ? link : String(link),
               description: typeof description === 'string' ? description : (description?.["#text"] || ''),
               pubDate,
-              feedUrl: feed.xmlUrl, // Use URL for signaling lookup
+              feedUrl: feed.xmlUrl,
               category: feed.category,
               sourceName: feed.title,
               isBookmarked: false,
@@ -73,17 +73,25 @@ export function useRSS() {
             }
           }
           await db.feeds.update(feed.id, { lastFetched: new Date().toISOString() });
+          // Trigger IQS calculation in background (non-blocking)
+          fetch(`/api/v1/iqs/${encodeURIComponent(feed.xmlUrl)}`, { method: 'POST' })
+            .then(res => res.json())
+            .then(json => {
+              if (json.success && json.data?.quality !== undefined) {
+                db.feeds.update(feed.id, { quality: json.data.quality });
+              }
+            })
+            .catch(err => console.warn('IQS update failed for', feed.title, err));
         } catch (e) {
           console.error(`Failed to fetch feed ${feed.title}:`, e);
         }
         await new Promise(resolve => setTimeout(resolve, 50));
       }
-      // Signal discovered articles to the global mesh
       if (discoveredArticles.length > 0) {
         await fetch('/api/signal/ingest', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(discoveredArticles.slice(0, 50)) // Limit batch size
+          body: JSON.stringify(discoveredArticles.slice(0, 50))
         }).catch(err => console.error('Signaling failed:', err));
       }
     } catch (e) {
