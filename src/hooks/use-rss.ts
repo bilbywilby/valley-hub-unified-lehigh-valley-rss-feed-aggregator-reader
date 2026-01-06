@@ -45,14 +45,8 @@ export function useRSS() {
         attributeNamePrefix: "@_",
       });
       // Strategy: Prioritize high-quality feeds or those never fetched, unless forced
-      const feedsToSync = force ? feeds : feeds.filter(feed => {
-        if (feed.quality <= 0) return false;
-        if (!feed.lastFetched) return true;
-        const timeSinceLastFetch = now - new Date(feed.lastFetched).getTime();
-        const threshold = feed.quality > 80 ? 3600000 : 21600000; // 1hr vs 6hr
-        return timeSinceLastFetch > threshold;
-      });
-      const batch = feedsToSync.slice(0, 30); // Higher limit for forced sync
+      const feedsToSync = force ? feeds.filter(feed => feed.quality > 50 && (!feed.lastFailed || (!isNaN(new Date(feed.lastFailed).getTime()) && now - new Date(feed.lastFailed).getTime() >= 86400000))) : feeds.filter(feed => { if(feed.quality <= 50) return false; if(feed.lastFailed && !isNaN(new Date(feed.lastFailed).getTime()) && (now - new Date(feed.lastFailed).getTime() < 86400000)) return false; if(!feed.lastFetched) return true; const lastFetchedTime = feed.lastFetched && !isNaN(new Date(feed.lastFetched).getTime()) ? new Date(feed.lastFetched).getTime() : 0; const timeSinceLastFetch = now - lastFetchedTime; const threshold = feed.quality > 80 ? 3600000 : 21600000; return timeSinceLastFetch > threshold; });
+      const batch = feedsToSync.slice(0, force ? 30 : 20);
       for (const feed of batch) {
         try {
           const response = await fetch(`/api/proxy?url=${encodeURIComponent(feed.xmlUrl)}`);

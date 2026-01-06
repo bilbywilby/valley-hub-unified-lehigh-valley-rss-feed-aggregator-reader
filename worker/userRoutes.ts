@@ -86,7 +86,6 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
             const res = await fetch(url, { signal: controller.signal, headers:{'User-Agent':'ValleyHub-RSS-Proxy/1.0 (+https://valleyhub.app)'} });
             clearTimeout(timeoutId);
             if(!res.ok) {
-                console.warn(`Proxy failed ${res.status} for ${url}`);
                 return new Response(`RSS Proxy Error: ${res.status} ${res.statusText}`, {
                     status:502,
                     headers:{'Content-Type':'text/plain'}
@@ -105,7 +104,6 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
             return new Response(res.body!, {status: res.status, headers});
         } catch(err:any) {
             clearTimeout(timeoutId);
-            console.warn(`Proxy failed ${url}:`, err.message);
             return new Response(`Proxy Error: ${err.message}`, {status: 502, headers: {'Content-Type': 'text/plain'}});
         }
     });

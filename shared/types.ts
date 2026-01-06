@@ -24,6 +24,9 @@ export interface Feed {
     lng: number;
   };
   lastFetched?: string;
+  successCount?: number;
+  failCount?: number;
+  lastFailed?: string;
 }
 export interface DemoItem {
   id: string;

@@ -63,8 +63,7 @@ export class ValleyHubDB extends Dexie {
   async clearNonBookmarkedArticles() {
     return this.transaction('rw', this.articles, async () => {
       const nonBookmarkedKeys = await this.articles
-        .where('isBookmarked')
-        .notEqual(true)
+        .filter(article => !(article.isBookmarked ?? false))
         .primaryKeys();
       await this.articles.bulkDelete(nonBookmarkedKeys);
     });
@@ -80,7 +79,7 @@ export class ValleyHubDB extends Dexie {
       // Prune old non-bookmarked articles
       const oldArticles = await this.articles
         .where('pubDate').below(new Date(oneDayAgo).toISOString())
-        .filter(a => !a.isBookmarked)
+        .filter(a => !(a.isBookmarked ?? false))
         .primaryKeys();
       await this.articles.bulkDelete(oldArticles);
       // Prune synced telemetry older than 48h
