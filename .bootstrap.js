@@ -85,7 +85,8 @@ function runSetupCommands() {
     "bun add react-intersection-observer@^9.2.0",
     "bun add react-icons@^5.3.0",
     "bun add swiper@^11.1.14",
-    "bun add react-markdown@^9.0.1"
+    "bun add react-markdown@^9.0.1",
+    "bun install dexie-react-hooks"
 ];
     
     if (commands.length === 0) {
