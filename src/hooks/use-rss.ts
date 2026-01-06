@@ -1,138 +1,63 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState } from 'react';
 import { XMLParser } from 'fast-xml-parser';
 import { db } from '@/lib/db';
 import type { Article, Feed } from '@shared/types';
 import { v4 as uuidv4 } from 'uuid';
-import { MASTER_FEEDS } from '@shared/master-feeds';
 export function useRSS() {
   const [isSyncing, setIsSyncing] = useState(false);
-  const lastSyncRef = useRef<number>(0);
   const [error, setError] = useState<string | null>(null);
-  const generateSafeHash = async (input: string): Promise<string> => {
-    const msgUint8 = new TextEncoder().encode(input);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 32);
-  };
-  const syncFeeds = useCallback(async (force: boolean = false) => {
-    if (!navigator.onLine) {
-      setError('Offline: Connect to synchronize regional mesh');
-      return;
-    }
+  const syncFeeds = async () => {
     setIsSyncing(true);
     setError(null);
-    const discoveredArticles: Article[] = [];
     try {
-      let feeds = await db.feeds.toArray();
-      const identity = await db.identity.toCollection().first();
-      // Population phase if empty
-      if (feeds.length === 0) {
-        const initialFeeds = MASTER_FEEDS.map(f => ({ ...f, lastFetched: undefined }));
-        await db.feeds.bulkAdd(initialFeeds);
-        feeds = await db.feeds.toArray();
-      }
-      // Minimum sync interval check
-      const now = Date.now();
-      if (!force && lastSyncRef.current !== 0 && now - lastSyncRef.current < 30000) {
-        setError('Sync cooldown 30s');
-        setIsSyncing(false);
-        return;
-      }
-      lastSyncRef.current = now;
+      const feeds = await db.feeds.toArray();
       const parser = new XMLParser({
         ignoreAttributes: false,
         attributeNamePrefix: "@_",
       });
-      const feedsToSync = force 
-        ? feeds.filter(f => f.quality > 50) 
-        : feeds.filter(f => {
-            if (f.quality <= 50) return false;
-            const lastFetchedTime = f.lastFetched ? new Date(f.lastFetched).getTime() : 0;
-            const threshold = f.quality > 80 ? 3600000 : 21600000;
-            return (now - lastFetchedTime) > threshold;
-          });
-      const batch = feedsToSync.slice(0, force ? 30 : 20);
-      for (const feed of batch) {
-        if (!feed.id) continue;
+      for (const feed of feeds) {
         try {
-          const response = await fetch(`/api/v1/sentinel/proxy?url=${encodeURIComponent(feed.xmlUrl)}`);
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const response = await fetch(`/api/proxy?url=${encodeURIComponent(feed.xmlUrl)}`);
           const xmlText = await response.text();
           const jsonObj = parser.parse(xmlText);
-          const channel = jsonObj.rss?.channel;
-          const atomFeed = jsonObj.feed;
-          const items = channel?.item || atomFeed?.entry || [];
-          const normalizedItems = await Promise.all((Array.isArray(items) ? items : [items]).map(async (item: any) => {
-            const title = item.title?.["#text"] || item.title || 'No title';
-            let link = "";
-            if (typeof item.link === 'string') link = item.link;
-            else if (Array.isArray(item.link)) {
-              const alternate = item.link.find((l: any) => l["@_rel"] === "alternate") || item.link[0];
-              link = alternate["@_href"] || alternate;
-            } else if (item.link?.["@_href"]) {
-              link = item.link["@_href"];
-            }
-            const description = item.description || item.summary?.["#text"] || item.summary || item.content?.["#text"] || item.content || '';
-            let pubDate = new Date().toISOString();
-            const rawDate = item.pubDate || item.published || item.updated;
-            if (rawDate) {
-              const parsed = new Date(rawDate);
-              if (!isNaN(parsed.getTime())) pubDate = parsed.toISOString();
-            }
-            const hash = await generateSafeHash(String(title) + String(link));
+          const items = jsonObj.rss?.channel?.item || jsonObj.feed?.entry || [];
+          const normalizedItems = (Array.isArray(items) ? items : [items]).map((item: any) => {
+            const title = item.title || '';
+            const link = item.link?.['@_href'] || item.link || '';
+            const description = item.description || item.summary || item.content || '';
+            const pubDate = item.pubDate || item.published || item.updated || new Date().toISOString();
+            // Basic hash for deduplication
+            const hash = btoa(title + link).substring(0, 32);
             return {
               id: uuidv4(),
               hash,
-              title: String(title),
-              link: String(link),
-              description: typeof description === 'string' ? description : (description?.["#text"] || ''),
-              pubDate,
-              feedUrl: feed.xmlUrl,
+              title,
+              link,
+              description: typeof description === 'string' ? description : '',
+              pubDate: new Date(pubDate).toISOString(),
+              feedUrl: feed.id,
               category: feed.category,
               sourceName: feed.title,
               isBookmarked: false,
             } as Article;
-          }));
+          });
+          // Deduplicate and bulk add
           for (const article of normalizedItems) {
             const existing = await db.articles.where('hash').equals(article.hash).first();
             if (!existing) {
               await db.articles.add(article);
-              discoveredArticles.push(article);
             }
           }
-          await db.feeds.update(feed.id, {
-            quality: Math.min(100, (feed.quality || 0) + 1),
-            lastFetched: new Date().toISOString(),
-            successCount: (feed.successCount || 0) + 1
-          });
-          if (identity) {
-            fetch(`/api/v1/iqs/${encodeURIComponent(feed.xmlUrl)}`, {
-              method: 'POST',
-              headers: { 'x-node-id': identity.nodeId }
-            }).catch(() => {});
-          }
+          await db.feeds.update(feed.id, { lastFetched: new Date().toISOString() });
         } catch (e) {
-          console.error(`[MESH DIAGNOSTIC] Feed failure [${feed.title}]:`, e);
-          await db.feeds.update(feed.id, {
-            quality: Math.max(0, (feed.quality || 0) - 5),
-            lastFailed: new Date().toISOString(),
-            failCount: (feed.failCount || 0) + 1
-          });
+          console.error(`Failed to fetch feed ${feed.title}:`, e);
         }
-        await new Promise(r => setTimeout(r, 50));
-      }
-      if (discoveredArticles.length > 0 && identity) {
-        await fetch('/api/signal/ingest', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-node-id': identity.nodeId },
-          body: JSON.stringify(discoveredArticles.slice(0, 50))
-        }).catch(() => {});
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Mesh synchronization failure');
+      setError(e instanceof Error ? e.message : 'Unknown sync error');
     } finally {
       setIsSyncing(false);
     }
-  }, []);
+  };
   return { syncFeeds, isSyncing, error };
 }

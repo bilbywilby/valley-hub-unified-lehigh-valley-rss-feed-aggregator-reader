@@ -12,6 +12,8 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 import '@/index.css'
 import { HomePage } from '@/pages/HomePage'
+import { FeedManagementPage } from '@/pages/FeedManagementPage'
+import { ArticleDetailPage } from '@/pages/ArticleDetailPage'
 import { ComingSoonPage } from '@/pages/ComingSoonPage'
 const queryClient = new QueryClient();
 const router = createBrowserRouter([
@@ -21,8 +23,13 @@ const router = createBrowserRouter([
     errorElement: <RouteErrorBoundary />,
   },
   {
+    path: "/article/:id",
+    element: <ArticleDetailPage />,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
     path: "/feeds",
-    element: <ComingSoonPage title="Feed Management" />,
+    element: <FeedManagementPage />,
     errorElement: <RouteErrorBoundary />,
   },
   {
