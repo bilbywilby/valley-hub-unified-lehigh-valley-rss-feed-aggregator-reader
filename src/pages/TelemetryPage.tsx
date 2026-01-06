@@ -2,7 +2,8 @@ import React, { useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, Title, AreaChart, BarChart, Text, Metric, Flex, Badge, Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell } from '@tremor/react';
+import { Card, Title, AreaChart, BarChart, Text, Metric, Flex, Badge as TremorBadge, Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell } from '@tremor/react';
+import { Badge as ShadcnBadge } from '@/components/ui/badge';
 import { Activity, Zap, Newspaper, Rss, ShieldCheck, Globe } from 'lucide-react';
 import { subDays, format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -73,28 +74,28 @@ export function TelemetryPage() {
           <Card decoration="top" decorationColor="orange" className="bg-surface-container-low border-none shadow-md3-1 rounded-3xl">
             <Flex alignItems="start">
               <Text className="font-mono text-[10px] uppercase font-black opacity-40 tracking-widest">Registry Density</Text>
-              <Badge icon={Newspaper} color="orange">INGESTED</Badge>
+              <TremorBadge icon={Newspaper} color="orange">INGESTED</TremorBadge>
             </Flex>
             <Metric className="font-terminal font-black text-4xl mt-4 text-primary">{articles?.length || 0}</Metric>
           </Card>
           <Card decoration="top" decorationColor="blue" className="bg-surface-container-low border-none shadow-md3-1 rounded-3xl">
             <Flex alignItems="start">
               <Text className="font-mono text-[10px] uppercase font-black opacity-40 tracking-widest">Lattice Nodes</Text>
-              <Badge icon={Rss} color="blue">ACTIVE</Badge>
+              <TremorBadge icon={Rss} color="blue">ACTIVE</TremorBadge>
             </Flex>
             <Metric className="font-terminal font-black text-4xl mt-4 text-blue-400">{feeds?.length || 0}</Metric>
           </Card>
           <Card decoration="top" decorationColor="emerald" className="bg-surface-container-low border-none shadow-md3-1 rounded-3xl">
             <Flex alignItems="start">
               <Text className="font-mono text-[10px] uppercase font-black opacity-40 tracking-widest">Mesh Stability</Text>
-              <Badge icon={ShieldCheck} color="emerald">STABLE</Badge>
+              <TremorBadge icon={ShieldCheck} color="emerald">STABLE</TremorBadge>
             </Flex>
             <Metric className="font-terminal font-black text-4xl mt-4 text-emerald-400">99.98%</Metric>
           </Card>
           <Card decoration="top" decorationColor="purple" className="bg-surface-container-low border-none shadow-md3-1 rounded-3xl">
             <Flex alignItems="start">
               <Text className="font-mono text-[10px] uppercase font-black opacity-40 tracking-widest">Throughput</Text>
-              <Badge icon={Zap} color="purple">TURBO</Badge>
+              <TremorBadge icon={Zap} color="purple">TURBO</TremorBadge>
             </Flex>
             <Metric className="font-terminal font-black text-4xl mt-4 text-purple-400">42 Mb/s</Metric>
           </Card>
@@ -109,7 +110,6 @@ export function TelemetryPage() {
               categories={["Mesh Processing Volume"]}
               colors={["orange"]}
               showAnimation={true}
-              curveType="monotone"
               showGridLines={false}
             />
           </Card>
@@ -130,7 +130,7 @@ export function TelemetryPage() {
         <Card className="bg-surface-container-low border-none shadow-md3-2 rounded-4xl overflow-hidden">
           <div className="p-8 bg-surface-container-high/50 border-b border-border/10 flex justify-between items-center">
              <Title className="font-mono text-[11px] uppercase font-black tracking-[0.3em] text-primary">Information Quality Index (IQS_RECAP)</Title>
-             <Badge variant="outline" className="border-primary/20 text-primary uppercase font-mono text-[9px]">v14.2.1</Badge>
+             <ShadcnBadge variant="outline" className="border-primary/20 text-primary uppercase font-mono text-[9px]">v14.2.1</ShadcnBadge>
           </div>
           <Table className="mt-0">
             <TableHead className="bg-surface-container-high/30">
@@ -147,9 +147,9 @@ export function TelemetryPage() {
                     <Text className="font-bold text-foreground group-hover:text-primary transition-colors">{item.title}</Text>
                   </TableCell>
                   <TableCell className="px-8 py-5">
-                    <Badge color={item.quality > 90 ? "emerald" : "orange"} className="font-mono text-[9px] uppercase font-black tracking-tighter">
+                    <TremorBadge color={item.quality > 90 ? "emerald" : "orange"} className="font-mono text-[9px] uppercase font-black tracking-tighter">
                       {item.category} // SECURE_SHARD
-                    </Badge>
+                    </TremorBadge>
                   </TableCell>
                   <TableCell className="text-right px-8 py-5">
                     <Text className="font-terminal font-black text-primary text-lg tracking-tighter">{item.quality}.00%</Text>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, Network, Database, RefreshCcw, Hash, Clock, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -14,29 +14,48 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 function LatticeMesh({ active }: { active: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const resizeCanvas = useCallback(() => {
+    if (!canvasRef.current || !containerRef.current) return;
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = container.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    const ctx = canvas.getContext('2d');
+    if (ctx) ctx.scale(dpr, dpr);
+  }, []);
   useEffect(() => {
     if (!canvasRef.current) return;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
     let animationFrame: number;
-    const nodes = Array.from({ length: 40 }, () => ({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
+    const nodeCount = Math.min(60, Math.floor((window.innerWidth * window.innerHeight) / 15000));
+    const nodes = Array.from({ length: nodeCount }, () => ({
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * 400,
       vx: (Math.random() - 0.5) * 0.5,
       vy: (Math.random() - 0.5) * 0.5,
       pulse: Math.random() * Math.PI,
     }));
     const render = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const width = canvas.width / (window.devicePixelRatio || 1);
+      const height = canvas.height / (window.devicePixelRatio || 1);
+      ctx.clearRect(0, 0, width, height);
       ctx.strokeStyle = active ? 'rgba(243, 128, 32, 0.2)' : 'rgba(255, 255, 255, 0.05)';
       ctx.lineWidth = 0.5;
       nodes.forEach((node, i) => {
         node.x += node.vx * (active ? 2 : 1);
         node.y += node.vy * (active ? 2 : 1);
         node.pulse += 0.02;
-        if (node.x < 0 || node.x > canvas.width) node.vx *= -1;
-        if (node.y < 0 || node.y > canvas.height) node.vy *= -1;
+        if (node.x < 0) node.x = width;
+        if (node.x > width) node.x = 0;
+        if (node.y < 0) node.y = height;
+        if (node.y > height) node.y = 0;
         ctx.beginPath();
         ctx.arc(node.x, node.y, 1.5, 0, Math.PI * 2);
         ctx.fillStyle = active ? `rgba(243, 128, 32, ${0.3 + Math.sin(node.pulse) * 0.2})` : 'rgba(255, 255, 255, 0.1)';
@@ -44,11 +63,11 @@ function LatticeMesh({ active }: { active: boolean }) {
         for (let j = i + 1; j < nodes.length; j++) {
           const other = nodes[j];
           const dist = Math.hypot(node.x - other.x, node.y - other.y);
-          if (dist < 100) {
+          if (dist < 120) {
             ctx.beginPath();
             ctx.moveTo(node.x, node.y);
             ctx.lineTo(other.x, other.y);
-            ctx.globalAlpha = (1 - dist / 100) * (active ? 0.8 : 0.3);
+            ctx.globalAlpha = (1 - dist / 120) * (active ? 0.8 : 0.3);
             ctx.stroke();
           }
         }
@@ -56,9 +75,16 @@ function LatticeMesh({ active }: { active: boolean }) {
       animationFrame = requestAnimationFrame(render);
     };
     render();
-    return () => cancelAnimationFrame(animationFrame);
-  }, [active]);
-  return <canvas ref={canvasRef} width={800} height={400} className="absolute inset-0 w-full h-full pointer-events-none opacity-60" />;
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      window.removeEventListener('resize', resizeCanvas);
+    };
+  }, [active, resizeCanvas]);
+  return (
+    <div ref={containerRef} className="absolute inset-0 w-full h-full overflow-hidden">
+      <canvas ref={canvasRef} className="block w-full h-full pointer-events-none opacity-60" />
+    </div>
+  );
 }
 export function HomePage() {
   const articles = useLiveQuery(() => db.articles.orderBy('pubDate').reverse().limit(100).toArray());
@@ -82,7 +108,7 @@ export function HomePage() {
     ];
     logs.forEach((log, i) => {
       setTimeout(() => {
-        setBootSequence(prev => [...prev, log].slice(-6));
+        setBootSequence(prev => [...prev, log].slice(-5)); // Keep list short for small viewports
       }, i * 350);
     });
     if (feedsCount === 0) setTimeout(() => syncFeeds(), 3000);
@@ -90,7 +116,7 @@ export function HomePage() {
   return (
     <AppLayout container={true}>
       <div className="space-y-12">
-        <section className="bg-surface-container-low rounded-4xl border border-border/10 p-10 shadow-md3-3 overflow-hidden relative min-h-[400px] flex items-center">
+        <section className="bg-surface-container-low rounded-4xl border border-border/10 p-6 md:p-10 shadow-md3-3 overflow-hidden relative min-h-[450px] md:min-h-[400px] flex items-center">
           <LatticeMesh active={isSyncing} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10 w-full">
             <div className="space-y-8">
@@ -98,7 +124,7 @@ export function HomePage() {
                 <div className="h-3 w-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
                 <span className="text-[10px] font-mono font-black uppercase tracking-[0.2em] text-emerald-500">Lattice v2 // Active</span>
               </div>
-              <h1 className="text-6xl md:text-7xl font-display font-black tracking-tighter leading-[0.85] uppercase">
+              <h1 className="text-5xl md:text-7xl font-display font-black tracking-tighter leading-[0.85] uppercase">
                 Valley <span className="text-primary">Lattice</span>
               </h1>
               <p className="text-xl text-muted-foreground font-medium max-w-md leading-relaxed">
@@ -108,7 +134,7 @@ export function HomePage() {
                 <Button
                   onClick={() => syncFeeds(true)}
                   disabled={isSyncing}
-                  className="rounded-full bg-primary h-16 px-10 font-black uppercase text-xs tracking-widest shadow-glow active:scale-95 transition-all group"
+                  className="rounded-full bg-primary h-14 md:h-16 px-8 md:px-10 font-black uppercase text-xs tracking-widest shadow-glow active:scale-95 transition-all group"
                 >
                   {isSyncing ? <RefreshCcw className="mr-3 h-5 w-5 animate-spin" /> : <Activity className="mr-3 h-5 w-5 group-hover:rotate-12 transition-transform" />}
                   {isSyncing ? "Mesh Syncing..." : "Update Network"}
@@ -120,13 +146,14 @@ export function HomePage() {
                 )}
               </div>
             </div>
-            <div className="bg-black/60 backdrop-blur-md rounded-3xl p-8 font-mono text-[11px] leading-relaxed border border-border/10 shadow-2xl min-h-[200px] flex flex-col justify-end">
-              <AnimatePresence>
+            <div className="bg-black/60 backdrop-blur-md rounded-3xl p-6 md:p-8 font-mono text-[11px] leading-relaxed border border-border/10 shadow-2xl min-h-[160px] md:min-h-[200px] flex flex-col justify-end">
+              <AnimatePresence mode="popLayout">
                 {bootSequence.map((log, i) => (
                   <motion.div
-                    key={i}
-                    initial={{ opacity: 0, x: -20 }}
+                    key={`${log}-${i}`}
+                    initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
                     className={cn(
                       "terminal-text py-0.5",
                       i === bootSequence.length - 1 ? "text-primary font-bold" : "text-muted-foreground/80"
@@ -174,7 +201,7 @@ function ArticleCard({ article, index }: { article: any; index: number }) {
         <Card className="h-full bg-surface-container-low border-none shadow-md3-1 rounded-3xl group hover:bg-surface-container-high hover:shadow-md3-3 transition-all overflow-hidden flex flex-col">
           <div className="aspect-[4/3] relative overflow-hidden m-3 rounded-2xl bg-black/20">
             {article.imageUrl ? (
-              <img src={article.imageUrl} className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-700" loading="lazy" />
+              <img src={article.imageUrl} className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-700" alt={article.title} loading="lazy" />
             ) : (
               <div className="w-full h-full flex items-center justify-center opacity-10">
                 <Hash className="w-16 h-16 text-primary" />
