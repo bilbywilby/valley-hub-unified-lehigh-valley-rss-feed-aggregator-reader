@@ -1,16 +1,19 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { XMLParser } from 'fast-xml-parser';
 import { db } from '@/lib/db';
 import type { Article } from '@shared/types';
 import { v4 as uuidv4 } from 'uuid';
-async function generateSafeHash(input: string): Promise<string> {
-  const msgUint8 = new TextEncoder().encode(input);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 32);
-}
+import { MASTER_FEEDS } from '../../shared/master-feeds';
+
 export function useRSS() {
+  const generateSafeHash = async (input: string): Promise<string> => {
+    const msgUint8 = new TextEncoder().encode(input);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 32);
+  };
   const [isSyncing, setIsSyncing] = useState(false);
+  const lastSyncRef = useRef<number>(0);
   const [error, setError] = useState<string | null>(null);
   const syncFeeds = async () => {
     setIsSyncing(true);
@@ -18,12 +21,28 @@ export function useRSS() {
     const discoveredArticles: Article[] = [];
     try {
       const feeds = await db.feeds.toArray();
-      if (feeds.length === 0) return;
+      if (Date.now() - lastSyncRef.current < 300000) {
+        setError('Sync too frequent, wait 5 minutes');
+        setIsSyncing(false);
+        return;
+      }
+      lastSyncRef.current = Date.now();
+      if (feeds.length === 0) {
+        await db.feeds.bulkAdd(MASTER_FEEDS.map(f => ({...f, lastFetched: undefined})));
+        return;
+      }
       const parser = new XMLParser({
         ignoreAttributes: false,
         attributeNamePrefix: "@_",
       });
-      for (const feed of feeds) {
+      const feedsToSync = feeds.filter(feed => feed.quality > 20 || !feed.lastFetched || (() => {
+        try {
+          return (Date.now() - new Date(feed.lastFetched!).getTime()) > 24*60*60*1000;
+        } catch {
+          return true;
+        }
+      })());
+      for (const feed of feedsToSync) {
         try {
           const response = await fetch(`/api/proxy?url=${encodeURIComponent(feed.xmlUrl)}`);
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -72,20 +91,28 @@ export function useRSS() {
               discoveredArticles.push(article);
             }
           }
-          await db.feeds.update(feed.id, { lastFetched: new Date().toISOString() });
+          if (normalizedItems.length === 0 && feed.id) {
+            await db.feeds.update(feed.id, { quality: 0, lastFetched: new Date().toISOString() });
+          } else if (feed.id) {
+            const newQuality = Math.min(100, (feed.quality || 50) + (normalizedItems.length * 2));
+            await db.feeds.update(feed.id, { quality: newQuality, lastFetched: new Date().toISOString() });
+          }
           // Trigger IQS calculation in background (non-blocking)
           fetch(`/api/v1/iqs/${encodeURIComponent(feed.xmlUrl)}`, { method: 'POST' })
             .then(res => res.json())
             .then(json => {
-              if (json.success && json.data?.quality !== undefined) {
+              if (json.success && json.data?.quality !== undefined && feed.id) {
                 db.feeds.update(feed.id, { quality: json.data.quality });
               }
             })
             .catch(err => console.warn('IQS update failed for', feed.title, err));
         } catch (e) {
           console.error(`Failed to fetch feed ${feed.title}:`, e);
+          if (feed.id) {
+            await db.feeds.update(feed.id, { lastFetched: new Date().toISOString(), quality: 0 });
+          }
         }
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(r => setTimeout(r, 100));
       }
       if (discoveredArticles.length > 0) {
         await fetch('/api/signal/ingest', {

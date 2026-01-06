@@ -61,14 +61,43 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         const stats = await getStub(c).getGlobalStats(feedUrl);
         return c.json({ success: true, data: stats });
     });
+    app.use('/api/proxy', async (c, next) => {
+        const ip = c.req.header('cf-connecting-ip') || 'anonymous';
+        const stub = getStub(c);
+        const { exceeded, retryAfter } = await stub.checkRateLimit(ip, 100, 60);
+        if (exceeded) {
+            return c.json({
+                success: false,
+                error: 'Too Many Requests',
+                retryAfter
+            }, 429, { 'Retry-After': retryAfter.toString() });
+        }
+        await next();
+    });
+
     app.get('/api/proxy', async (c) => {
         const url = c.req.query('url');
-        if (!url) return c.json({ success: false, error: 'URL required' }, 400);
+        if(!url || !url.startsWith('http')) {
+            return c.json({success:false, error:'Valid URL query param required'},400);
+        }
         try {
-            const res = await fetch(url, { headers: { 'User-Agent': 'ValleyHub/1.0' } });
-            return c.text(await res.text());
-        } catch (err) {
-            return c.json({ success: false, error: 'Fetch failed' }, 500);
+            const res = await fetch(url, {headers:{'User-Agent':'ValleyHub-RSS-Proxy/1.0 (+https://valleyhub.app)'}});
+            if(!res.ok) {
+                console.warn(`Proxy failed ${res.status} for ${url}`);
+                return new Response(`RSS Proxy Error: ${res.status} ${res.statusText}`, {
+                    status:502,
+                    headers:{'Content-Type':'text/plain'}
+                });
+            }
+            const headers = new Headers(res.headers);
+            headers.set('Cache-Control','public, max-age=900, s-maxage=900');
+            headers.delete('Content-Encoding');
+            headers.append('Access-Control-Allow-Origin','*');
+            headers.append('X-Proxy-Source',url);
+            return new Response(res.body, {status:res.status, headers});
+        } catch(err:any) {
+            console.error('Proxy error:',err);
+            return c.json({success:false,error:`Proxy failed: ${err.message}`},500);
         }
     });
     app.post('/api/telemetry', async (c) => {
