@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Trash2, Rss, Globe, ExternalLink, AlertCircle, Sparkles, Loader2, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Plus, Trash2, Rss, Globe, AlertCircle, Sparkles, Loader2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { MASTER_FEEDS } from '@shared/master-feeds';
 import { toast } from 'sonner';
@@ -39,7 +39,7 @@ export function FeedManagementPage() {
       });
       setNewUrl('');
       toast.success("Source added successfully");
-    } catch (e) {
+    } catch (err) {
       toast.error("Please enter a valid URL");
     }
   };
@@ -123,15 +123,20 @@ function FeedCard({ feed, onRemove }: { feed: any, onRemove: () => void }) {
   const [globalStats, setGlobalStats] = useState<any>(null);
   const identity = useLiveQuery(() => db.identity.toCollection().first());
   useEffect(() => {
+    let isMounted = true;
     const fetchStats = async () => {
       try {
         const res = await fetch(`/api/signal/stats/${encodeURIComponent(feed.xmlUrl)}`);
         const json = await res.json();
-        if (json.success) setGlobalStats(json.data);
-      } catch (e) {}
+        if (isMounted && json.success) setGlobalStats(json.data);
+      } catch (err) {
+        // Silently skip if network or proxy fails for individual stats
+        console.warn(`Could not fetch stats for ${feed.title}`, err);
+      }
     };
     fetchStats();
-  }, [feed.xmlUrl]);
+    return () => { isMounted = false; };
+  }, [feed.xmlUrl, feed.title]);
   const handleVote = async (score: number) => {
     if (!identity) return;
     try {
@@ -144,7 +149,7 @@ function FeedCard({ feed, onRemove }: { feed: any, onRemove: () => void }) {
         toast.success("Vote registered with mesh");
         await db.votes.put({ feedUrl: feed.xmlUrl, lastVoted: Date.now(), score });
       }
-    } catch (e) {
+    } catch (err) {
       toast.error("Failed to vote");
     }
   };
@@ -170,7 +175,7 @@ function FeedCard({ feed, onRemove }: { feed: any, onRemove: () => void }) {
         </div>
         <div className="flex items-center justify-between pt-1">
           <div className="flex gap-3 text-xs text-muted-foreground">
-            <a href={feed.htmlUrl} target="_blank" className="hover:text-brand-orange font-medium flex items-center gap-1">
+            <a href={feed.htmlUrl} target="_blank" rel="noopener noreferrer" className="hover:text-brand-orange font-medium flex items-center gap-1">
               <Globe className="h-3 w-3" /> Web
             </a>
           </div>

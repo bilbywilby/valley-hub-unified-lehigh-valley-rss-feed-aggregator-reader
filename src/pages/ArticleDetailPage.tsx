@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { useTelemetry } from '@/hooks/use-telemetry';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Bookmark, Share2, Calendar, Globe, ExternalLink, Type, ShieldCheck } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
@@ -24,17 +25,23 @@ export function ArticleDetailPage() {
         source: article.sourceName,
         category: article.category
       });
+      let isMounted = true;
       // Fetch source trust data
       fetch(`/api/signal/stats/${encodeURIComponent(article.feedUrl)}`)
         .then(res => res.json())
         .then(json => {
-          if (json.success && json.data.consensusScore) {
+          if (isMounted && json.success && json.data?.consensusScore) {
             setConsensus(json.data.consensusScore);
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          // Silent catch for network stats
+        });
+      return () => {
+        isMounted = false;
+      };
     }
-  }, [articleId, hasArticle, trackEvent, article]);
+  }, [articleId, hasArticle, trackEvent]); // Stable dependencies
   const sanitizedContent = useMemo(() => {
     if (!article?.description) return '';
     return article.description.replace(/<style([\s\S]*?)<\/style>/gi, '')
@@ -68,9 +75,9 @@ export function ArticleDetailPage() {
           <Button variant="ghost" onClick={() => navigate(-1)} className="-ml-4">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back
           </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setIsReadabilityMode(!isReadabilityMode)}
             className={isReadabilityMode ? "text-brand-orange bg-brand-orange/10" : "text-muted-foreground"}
           >
@@ -104,8 +111,8 @@ export function ArticleDetailPage() {
             </div>
           </header>
           <article className={`max-w-none transition-all duration-300 ${
-            isReadabilityMode 
-              ? 'prose prose-neutral dark:prose-invert prose-2xl leading-relaxed font-serif' 
+            isReadabilityMode
+              ? 'prose prose-neutral dark:prose-invert prose-2xl leading-relaxed font-serif'
               : 'prose prose-neutral dark:prose-invert prose-lg prose-p:leading-relaxed'
           }`}>
             {sanitizedContent.includes('<') && sanitizedContent.includes('>') ? (

@@ -49,6 +49,15 @@ export class ValleyHubDB extends Dexie {
     this.version(3).stores({
       votes: 'feedUrl, lastVoted'
     });
+    // CRITICAL: Handle multi-tab schema upgrades gracefully
+    this.on('versionchange', () => {
+      console.warn('Another connection wants to upgrade the database. Closing now.');
+      this.close();
+      // Optional: reload to pick up new schema
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
+    });
   }
 }
 export const db = new ValleyHubDB();
