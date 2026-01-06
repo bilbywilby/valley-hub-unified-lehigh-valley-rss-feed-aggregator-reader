@@ -3,39 +3,64 @@ import { Env } from './core-utils';
 import type { Article, Feed } from '@shared/types';
 export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const getStub = (c: any) => c.env.GlobalDurableObject.get(c.env.GlobalDurableObject.idFromName("global"));
-    // Rate Limiting Middleware for v1 API
+    // Sentinel v1 API Rate Limiting
     app.use('/api/v1/*', async (c, next) => {
         const ip = c.req.header('cf-connecting-ip') || 'anonymous';
         const stub = getStub(c);
-        const { exceeded, retryAfter } = await stub.checkRateLimit(ip, 100, 60); // 100 req per min
+        const { exceeded, retryAfter } = await stub.checkRateLimit(ip, 120, 60);
         if (exceeded) {
-            return c.json({ 
-                success: false, 
-                error: 'Too Many Requests',
-                retryAfter 
-            }, 429, { 'Retry-After': retryAfter.toString() });
+            return c.json({ success: false, error: 'Too Many Requests', retryAfter }, 429);
         }
         await next();
     });
-    // Network Sentinel Endpoints
-    app.get('/api/v1/sentinel', (c) => c.json({ success: true, status: 'online', monitor: 'Network Sentinel v1' }));
-    app.post('/api/v1/register-node', async (c) => {
-        const body = await c.req.json();
-        if (!body.nodeId) return c.json({ success: false, error: 'nodeId required' }, 400);
-        await getStub(c).registerNode(body.nodeId, body.metadata || {});
+    // Health Check
+    app.get('/api/v1/health', (c) => c.json({ 
+        success: true, 
+        status: 'online', 
+        version: '1.2.0',
+        timestamp: new Date().toISOString() 
+    }));
+    // Discovery Evolution
+    app.post('/api/v1/discover/announce', async (c) => {
+        const { nodeId, coords } = await c.req.json();
+        if (!nodeId) return c.json({ success: false, error: 'nodeId required' }, 400);
+        await getStub(c).announceNode(nodeId, coords || { lat: 0, lng: 0 });
         return c.json({ success: true });
     });
-    app.get('/api/v1/discover', async (c) => {
-        const data = await getStub(c).getDiscoverySample();
-        return c.json({ success: true, data });
+    app.get('/api/v1/discover/nodes', async (c) => {
+        const nodes = await getStub(c).getActiveNodes();
+        return c.json({ success: true, data: nodes });
     });
-    // Information Quality Index (IQS)
+    // Sentinel Proxy v2
+    app.get('/api/v1/sentinel/proxy', async (c) => {
+        const url = c.req.query('url');
+        if(!url || !url.startsWith('http')) {
+            return c.json({success:false, error:'Valid URL required'}, 400);
+        }
+        try {
+            const res = await fetch(url, { 
+                headers: { 'User-Agent': 'Valley-Hub-Sentinel/2.0' } 
+            });
+            if(!res.ok) throw new Error(`Source Error: ${res.status}`);
+            const headers = new Headers(res.headers);
+            headers.set('Cache-Control', 'public, s-maxage=300, max-age=300'); // 5-minute cache
+            headers.set('Access-Control-Allow-Origin', '*');
+            return new Response(res.body, { status: res.status, headers });
+        } catch(err: any) {
+            return c.json({ success: false, error: err.message }, 502);
+        }
+    });
+    // Support Legacy Path for compatibility
+    app.get('/api/proxy', (c) => {
+        const url = c.req.query('url');
+        return c.redirect(`/api/v1/sentinel/proxy?url=${encodeURIComponent(url || '')}`);
+    });
+    // IQS & Signaling
     app.post('/api/v1/iqs/:feedUrl', async (c) => {
         const feedUrl = decodeURIComponent(c.req.param('feedUrl'));
         const score = await getStub(c).calculateIQS(feedUrl);
         return c.json({ success: true, data: { quality: score } });
     });
-    // Original Legacy Endpoints (v0)
     app.get('/api/articles', async (c) => {
         const data = await getStub(c).getArticles();
         return c.json({ success: true, data });
@@ -60,52 +85,6 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         const feedUrl = decodeURIComponent(c.req.param('feedUrl'));
         const stats = await getStub(c).getGlobalStats(feedUrl);
         return c.json({ success: true, data: stats });
-    });
-    app.use('/api/proxy', async (c, next) => {
-        const ip = c.req.header('cf-connecting-ip') || 'anonymous';
-        const stub = getStub(c);
-        const { exceeded, retryAfter } = await stub.checkRateLimit(ip, 100, 60);
-        if (exceeded) {
-            return c.json({
-                success: false,
-                error: 'Too Many Requests',
-                retryAfter
-            }, 429, { 'Retry-After': retryAfter.toString() });
-        }
-        await next();
-    });
-
-    app.get('/api/proxy', async (c) => {
-        const url = c.req.query('url');
-        if(!url || !url.startsWith('http')) {
-            return c.json({success:false, error:'Valid URL query param required'},400);
-        }
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-        try {
-            const res = await fetch(url, { signal: controller.signal, headers:{'User-Agent':'ValleyHub-RSS-Proxy/1.0 (+https://valleyhub.app)'} });
-            clearTimeout(timeoutId);
-            if(!res.ok) {
-                return new Response(`RSS Proxy Error: ${res.status} ${res.statusText}`, {
-                    status:502,
-                    headers:{'Content-Type':'text/plain'}
-                });
-            }
-            const ct = res.headers.get('content-type') || '';
-            if (!ct.match(/xml|rss/i)) {
-                throw new Error(`Invalid Content-Type: ${ct}`);
-            }
-            const headers = new Headers(res.headers);
-            headers.delete('content-length');
-            headers.delete('content-encoding');
-            headers.set('Cache-Control','public, max-age=900, s-maxage=900');
-            headers.set('Access-Control-Allow-Origin','*');
-            headers.set('X-Proxy-Source',url);
-            return new Response(res.body!, {status: res.status, headers});
-        } catch(err:any) {
-            clearTimeout(timeoutId);
-            return new Response(`Proxy Error: ${err.message}`, {status: 502, headers: {'Content-Type': 'text/plain'}});
-        }
     });
     app.post('/api/telemetry', async (c) => {
         const body = await c.req.json();

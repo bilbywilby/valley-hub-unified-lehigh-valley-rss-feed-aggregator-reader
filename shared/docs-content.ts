@@ -18,14 +18,14 @@ export const DOCS_MAP: Record<string, DocMetadata> = {
     title: 'Mesh System Design',
     description: 'Technical overview of the backend architecture.',
     category: 'Technical',
-    content: `# Regional Mesh System Design\n\nValley Hub utilizes a hybrid architecture combining client-side persistence with a Cloudflare Workers-based signaling and proxy layer.\n\n### Components\n- **Network Sentinel**: Privacy-shielding proxy.\n- **Durable Object**: Global consensus and IQS engine.\n- **Rate Limiting**: Protects the mesh from abuse.`
+    content: `# Regional Mesh System Design\n\nValley Hub utilizes a hybrid architecture combining client-side persistence with a Cloudflare Workers-based signaling and proxy layer.\n\n### Components\n- **Network Sentinel**: Privacy-shielding proxy with 5-minute cache headers.\n- **Durable Object**: Global consensus and IQS engine managing ephmeral node discovery.\n- **Rate Limiting**: Token-bucket protection on v1 API endpoints.`
   },
   'privacy-protocols': {
     slug: 'privacy-protocols',
     title: 'Privacy & Identity',
     description: 'Identity and location anonymization systems.',
     category: 'Privacy',
-    content: `# Privacy & Identity Protocols\n\nValley Hub uses cryptographic identity and mathematical noise.\n\n- **ECDSA P-256**: Non-extractable identity.\n- **Geo-Jitter**: Poisson-disc anonymization for location privacy.`
+    content: `# Privacy & Identity Protocols\n\nValley Hub uses cryptographic identity and mathematical noise.\n\n- **ECDSA P-256**: Non-extractable identity.\n- **Geo-Jitter**: Poisson-disc anonymization for location privacy.\n- **SHA-256 Commitment**: Content deduplication without text logging.\n- **Ephemerality**: Discovery signals expire after 24h.`
   },
   'data-persistence': {
     slug: 'data-persistence',

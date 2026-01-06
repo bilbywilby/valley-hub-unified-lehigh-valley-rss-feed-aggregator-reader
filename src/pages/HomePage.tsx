@@ -9,6 +9,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { applyGeoJitter } from '@/lib/telemetry';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -91,6 +92,27 @@ export function HomePage() {
   const feedsCount = useLiveQuery(() => db.feeds.count()) ?? 0;
   const { syncFeeds, isSyncing, error } = useRSS();
   const [bootSequence, setBootSequence] = useState<string[]>([]);
+
+  // Discovery Announcement Lifecycle
+  useEffect(() => {
+    const announce = async () => {
+      const identity = await db.identity.toCollection().first();
+      if (!identity) return;
+      const jittered = await applyGeoJitter(40.61, -75.47);
+      try {
+        await fetch('/api/v1/discover/announce', {
+          method: 'POST',
+          body: JSON.stringify({ nodeId: identity.nodeId, coords: jittered })
+        });
+        setLogs(prev => [...prev, `> SIGNAL_ANNOUNCE: [${identity.nodeId.slice(0,8)}] broadcasted`].slice(-6));
+      } catch (e) {}
+    };
+
+    announce();
+    const interval = setInterval(announce, 300000); // 5 mins
+    return () => clearInterval(interval);
+  }, []);
+
   const hasBooted = useRef(false);
   useEffect(() => {
     if (error) toast.error(error);
@@ -104,7 +126,8 @@ export function HomePage() {
       "> REGIONAL_MESH: Reconciling master streams...",
       "> SHARD_CONSENSUS: STABLE [Nodes: 14]",
       articles && articles.length > 0 ? "> CACHE_RECON: Local registry synchronized." : "> CACHE_NULL: Sync mandatory.",
-      "> SYSTEM_READY: Integrity verified."
+      "> SYSTEM_READY: Integrity verified.",
+      "> MESH_DISCOVERY: Peer list refreshed."
     ];
     logs.forEach((log, i) => {
       setTimeout(() => {

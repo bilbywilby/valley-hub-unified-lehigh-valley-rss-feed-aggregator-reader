@@ -49,7 +49,7 @@ export function useRSS() {
       const batch = feedsToSync.slice(0, force ? 30 : 20);
       for (const feed of batch) {
         try {
-          const response = await fetch(`/api/proxy?url=${encodeURIComponent(feed.xmlUrl)}`);
+          const response = await fetch(`/api/v1/sentinel/proxy?url=${encodeURIComponent(feed.xmlUrl)}`);
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const xmlText = await response.text();
           const jsonObj = parser.parse(xmlText);

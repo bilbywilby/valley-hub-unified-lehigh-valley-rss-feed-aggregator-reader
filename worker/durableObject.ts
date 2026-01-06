@@ -5,42 +5,40 @@ export class GlobalDurableObject extends DurableObject {
     // Rate Limiting Logic
     async checkRateLimit(ip: string, limit: number, windowSeconds: number): Promise<{ exceeded: boolean; retryAfter: number }> {
         const now = Math.floor(Date.now() / 1000);
-        const windowKey = `ratelimit_${ip}_${Math.floor(now / windowSeconds)}`;
+        const windowKey = `rl_v2_${ip}_${Math.floor(now / windowSeconds)}`;
         const count: number = (await this.ctx.storage.get(windowKey)) || 0;
         if (count >= limit) {
             const nextWindow = (Math.floor(now / windowSeconds) + 1) * windowSeconds;
             return { exceeded: true, retryAfter: nextWindow - now };
         }
         await this.ctx.storage.put(windowKey, count + 1);
-        // Clean up old window keys could be handled by a periodic alarm, 
-        // but for DO storage, we'll just set it.
         return { exceeded: false, retryAfter: 0 };
     }
-    // Node Discovery & Mesh Registry
-    async registerNode(nodeId: string, metadata: any): Promise<void> {
-        await this.ctx.storage.put(`node_${nodeId}`, { 
-            ...metadata, 
+    // Mesh Discovery & Signaling Evolution
+    async announceNode(nodeId: string, metadata: { lat: number, lng: number }): Promise<void> {
+        const key = `mesh_node_${nodeId}`;
+        await this.ctx.storage.put(key, {
             nodeId,
-            lastSeen: Date.now() 
+            coords: metadata,
+            lastSeen: Date.now()
         });
     }
-    async getDiscoverySample(): Promise<{ activeCount: number; sample: string[] }> {
-        const nodes = await this.ctx.storage.list({ prefix: "node_" });
+    async getActiveNodes(): Promise<any[]> {
+        const nodes = await this.ctx.storage.list({ prefix: "mesh_node_" });
         const now = Date.now();
-        const activeNodeIds: string[] = [];
-        nodes.forEach((val: any, key: string) => {
-            if (now - val.lastSeen < 3600000) { // Active within last hour
-                activeNodeIds.push(val.nodeId);
+        const active: any[] = [];
+        const threshold = 15 * 60 * 1000; // 15 minutes
+        nodes.forEach((val: any) => {
+            if (now - val.lastSeen < threshold) {
+                active.push({
+                    nodeId: val.nodeId,
+                    coords: val.coords,
+                    lastSeen: val.lastSeen
+                });
             }
         });
-        // Random sample of 5
-        const sample = activeNodeIds
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 5);
-        return {
-            activeCount: activeNodeIds.length,
-            sample
-        };
+        // Safety: Limit discovery sample to 20 nodes
+        return active.sort((a, b) => b.lastSeen - a.lastSeen).slice(0, 20);
     }
     // Information Quality Score (IQS) Calculation
     async calculateIQS(feedUrl: string): Promise<number> {
@@ -50,24 +48,20 @@ export class GlobalDurableObject extends DurableObject {
         const oneWeekAgo = now - (7 * 24 * 60 * 60 * 1000);
         const sixHoursAgo = now - (6 * 60 * 60 * 1000);
         let score = 0;
-        // 1. Frequency (40pts): >3 articles in 7 days
         const recentArticles = feedArticles.filter(a => new Date(a.pubDate).getTime() > oneWeekAgo);
         if (recentArticles.length > 3) score += 40;
         else if (recentArticles.length > 0) score += 20;
-        // 2. Latency (30pts): Update within 6 hours
         const latestArticle = feedArticles.reduce((latest, current) => {
             const currentSec = new Date(current.pubDate).getTime();
             return currentSec > latest ? currentSec : latest;
         }, 0);
         if (latestArticle > sixHoursAgo) score += 30;
-        // 3. Density (30pts): > average description length
         const avgDensity = await this.getGlobalAverageDensity();
-        const feedDensity = feedArticles.length > 0 
-            ? feedArticles.reduce((acc, a) => acc + (a.description?.length || 0), 0) / feedArticles.length 
+        const feedDensity = feedArticles.length > 0
+            ? feedArticles.reduce((acc, a) => acc + (a.description?.length || 0), 0) / feedArticles.length
             : 0;
         if (feedDensity > avgDensity) score += 30;
         else if (feedDensity > avgDensity * 0.5) score += 15;
-        // Persist the computed quality
         const feeds = await this.getFeeds();
         const updatedFeeds = feeds.map(f => f.xmlUrl === feedUrl ? { ...f, quality: score } : f);
         await this.ctx.storage.put("feeds", updatedFeeds);
@@ -79,7 +73,6 @@ export class GlobalDurableObject extends DurableObject {
         const total = articles.reduce((acc, a) => acc + (a.description?.length || 0), 0);
         return total / articles.length;
     }
-    // Existing methods (preserved)
     async getArticles(): Promise<Article[]> {
         const items = await this.ctx.storage.get("articles");
         if (items) return items as Article[];
@@ -121,9 +114,10 @@ export class GlobalDurableObject extends DurableObject {
         await this.ctx.storage.put(key, updated);
     }
     async getNetworkStats(): Promise<any> {
-        const discovery = await this.getDiscoverySample();
+        const activeNodes = await this.getActiveNodes();
         return {
-            activeNodes: discovery.activeCount,
+            activeNodes: activeNodes.length,
+            sample: activeNodes.map(n => n.nodeId).slice(0, 5),
             timestamp: Date.now()
         };
     }
