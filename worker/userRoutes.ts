@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { Env } from './core-utils';
-import type { Article, Feed } from '@shared/types';
+import type { Article } from '@shared/types';
 export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const getStub = (c: any) => c.env.GlobalDurableObject.get(c.env.GlobalDurableObject.idFromName("global"));
     // Sentinel v1 API Rate Limiting
@@ -13,13 +13,19 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         }
         await next();
     });
-    // Health Check
-    app.get('/api/v1/health', (c) => c.json({ 
-        success: true, 
-        status: 'online', 
-        version: '1.2.0',
-        timestamp: new Date().toISOString() 
-    }));
+    // Health Check - Enhanced with Engine and Region metadata
+    app.get('/api/v1/health', (c) => {
+        const cf = (c.req.raw as any).cf;
+        return c.json({
+            success: true,
+            status: 'online',
+            version: '1.4.0-v4',
+            engine: 'Cloudflare_V8_Isolates',
+            region: cf?.region || 'GLOBAL',
+            colo: cf?.colo || 'UNKNOWN',
+            timestamp: new Date().toISOString()
+        });
+    });
     // Discovery Evolution
     app.post('/api/v1/discover/announce', async (c) => {
         const { nodeId, coords } = await c.req.json();
@@ -31,21 +37,38 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         const nodes = await getStub(c).getActiveNodes();
         return c.json({ success: true, data: nodes });
     });
-    // Sentinel Proxy v2
+    // Mesh Signaling Reports
+    app.get('/api/v1/mesh/reports', async (c) => {
+        const reports = await getStub(c).getReports();
+        return c.json({ success: true, data: reports });
+    });
+    app.post('/api/v1/mesh/reports', async (c) => {
+        const { nodeId, report } = await c.req.json();
+        if (!nodeId) return c.json({ success: false, error: 'nodeId required' }, 400);
+        await getStub(c).saveReport(nodeId, report || {});
+        return c.json({ success: true });
+    });
+    // Sentinel Proxy v2 - Optimized with 10-minute cache and scrubbed headers
     app.get('/api/v1/sentinel/proxy', async (c) => {
         const url = c.req.query('url');
         if(!url || !url.startsWith('http')) {
             return c.json({success:false, error:'Valid URL required'}, 400);
         }
         try {
-            const res = await fetch(url, { 
-                headers: { 'User-Agent': 'Valley-Hub-Sentinel/2.0' } 
+            const scrubbedHeaders = new Headers();
+            scrubbedHeaders.set('User-Agent', 'Valley-Hub-Sentinel/4.0 (Regional Mesh Node; Privacy-First)');
+            scrubbedHeaders.set('Accept', 'application/rss+xml, application/atom+xml, text/xml, application/xml;q=0.9, */*;q=0.8');
+            const res = await fetch(url, {
+                headers: scrubbedHeaders,
+                redirect: 'follow'
             });
             if(!res.ok) throw new Error(`Source Error: ${res.status}`);
-            const headers = new Headers(res.headers);
-            headers.set('Cache-Control', 'public, s-maxage=300, max-age=300'); // 5-minute cache
-            headers.set('Access-Control-Allow-Origin', '*');
-            return new Response(res.body, { status: res.status, headers });
+            const responseHeaders = new Headers();
+            // 10-minute cache strategy (600 seconds)
+            responseHeaders.set('Cache-Control', 'public, s-maxage=600, max-age=600'); 
+            responseHeaders.set('Access-Control-Allow-Origin', '*');
+            responseHeaders.set('Content-Type', res.headers.get('Content-Type') || 'application/xml');
+            return new Response(res.body, { status: res.status, headers: responseHeaders });
         } catch(err: any) {
             return c.json({ success: false, error: err.message }, 502);
         }

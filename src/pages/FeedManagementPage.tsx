@@ -137,7 +137,9 @@ function FeedCard({ feed, onRemove }: { feed: any, onRemove: () => void }) {
         const res = await fetch(`/api/signal/stats/${encodeURIComponent(feed.xmlUrl)}`);
         const json = await res.json();
         if (isMounted && json.success) setGlobalStats(json.data);
-      } catch (err) {}
+      } catch (err) {
+        console.warn(`[MESH] Signal lookup failed for ${feed.title}`);
+      }
     };
     fetchStats();
     return () => { isMounted = false; };

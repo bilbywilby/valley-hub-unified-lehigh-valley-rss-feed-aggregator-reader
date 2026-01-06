@@ -1,6 +1,14 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Article, Feed } from '@shared/types';
 import { MOCK_ARTICLES, MOCK_FEEDS } from '@shared/mock-data';
+export interface MeshReport {
+    nodeId: string;
+    latency: number;
+    peerCount: number;
+    engineStatus: string;
+    timestamp: number;
+    protocolVersion: string;
+}
 export class GlobalDurableObject extends DurableObject {
     // Rate Limiting Logic
     async checkRateLimit(ip: string, limit: number, windowSeconds: number): Promise<{ exceeded: boolean; retryAfter: number }> {
@@ -20,7 +28,8 @@ export class GlobalDurableObject extends DurableObject {
         await this.ctx.storage.put(key, {
             nodeId,
             coords: metadata,
-            lastSeen: Date.now()
+            lastSeen: Date.now(),
+            protocol_version: 'v4'
         });
     }
     async getActiveNodes(): Promise<any[]> {
@@ -30,15 +39,34 @@ export class GlobalDurableObject extends DurableObject {
         const threshold = 15 * 60 * 1000; // 15 minutes
         nodes.forEach((val: any) => {
             if (now - val.lastSeen < threshold) {
-                active.push({
-                    nodeId: val.nodeId,
-                    coords: val.coords,
-                    lastSeen: val.lastSeen
-                });
+                active.push(val);
             }
         });
-        // Safety: Limit discovery sample to 20 nodes
         return active.sort((a, b) => b.lastSeen - a.lastSeen).slice(0, 20);
+    }
+    // New Signal Report Management
+    async saveReport(nodeId: string, report: Partial<MeshReport>): Promise<void> {
+        const timestamp = Date.now();
+        const reportKey = `mesh_report_${timestamp}_${nodeId}`;
+        const fullReport: MeshReport = {
+            nodeId,
+            latency: report.latency || 0,
+            peerCount: report.peerCount || 0,
+            engineStatus: report.engineStatus || 'STABLE',
+            timestamp,
+            protocolVersion: 'v4'
+        };
+        await this.ctx.storage.put(reportKey, fullReport);
+        // Cleanup old reports (keep last 100 in storage for safety, though API returns 50)
+        const allReports = await this.ctx.storage.list({ prefix: "mesh_report_" });
+        if (allReports.size > 100) {
+            const keysToDelete = Array.from(allReports.keys()).sort().slice(0, allReports.size - 100);
+            await Promise.all(keysToDelete.map(k => this.ctx.storage.delete(k)));
+        }
+    }
+    async getReports(): Promise<MeshReport[]> {
+        const reportsMap = await this.ctx.storage.list<MeshReport>({ prefix: "mesh_report_", reverse: true, limit: 50 });
+        return Array.from(reportsMap.values());
     }
     // Information Quality Score (IQS) Calculation
     async calculateIQS(feedUrl: string): Promise<number> {
@@ -115,9 +143,11 @@ export class GlobalDurableObject extends DurableObject {
     }
     async getNetworkStats(): Promise<any> {
         const activeNodes = await this.getActiveNodes();
+        const reports = await this.getReports();
         return {
             activeNodes: activeNodes.length,
             sample: activeNodes.map(n => n.nodeId).slice(0, 5),
+            latestReports: reports.length,
             timestamp: Date.now()
         };
     }
