@@ -4,59 +4,82 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    --foreground: 240 10% 3.9%;
     --primary: 27 91% 54%;
     --primary-foreground: 0 0% 98%;
     --primary-container: 27 91% 94%;
     --on-primary-container: 27 91% 14%;
     --surface: 0 0% 98%;
-    --surface-variant: 0 0% 92%;
-    --surface-container-low: 0 0% 96%;
-    --surface-container: 0 0% 94%;
-    --surface-container-high: 0 0% 92%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --border: 0 0% 89.8%;
+    --surface-variant: 240 4.8% 95.9%;
+    --surface-container-low: 240 4.8% 98%;
+    --surface-container: 240 4.8% 96%;
+    --surface-container-high: 240 4.8% 94%;
+    --surface-container-highest: 240 4.8% 92%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --border: 240 5.9% 90%;
     --ring: 27 91% 54%;
-    --radius: 1rem;
+    --radius: 1.5rem;
     --brand-orange: 27 91% 54%;
     --brand-red-orange: 19 80% 50%;
   }
   .dark {
-    --background: 240 43% 1%; /* #020205 */
+    --background: 240 30% 2%; /* #030305 */
     --foreground: 0 0% 98%;
     --primary: 27 91% 54%;
-    --primary-foreground: 0 0% 9%;
+    --primary-foreground: 240 30% 2%;
     --primary-container: 27 91% 20%;
     --on-primary-container: 27 91% 90%;
-    --surface: 240 43% 2%;
-    --surface-variant: 240 43% 8%;
-    --surface-container-low: 240 43% 3%;
-    --surface-container: 240 43% 4%;
-    --surface-container-high: 240 43% 6%;
-    --muted: 240 43% 4%;
-    --muted-foreground: 0 0% 63.9%;
-    --border: 240 43% 8%;
+    --surface: 240 30% 3%;
+    --surface-variant: 240 30% 8%;
+    --surface-container-low: 240 30% 4%;
+    --surface-container: 240 30% 6%;
+    --surface-container-high: 240 30% 9%;
+    --surface-container-highest: 240 30% 12%;
+    --muted: 240 30% 6%;
+    --muted-foreground: 240 5% 64.9%;
+    --border: 240 30% 12%;
     --brand-orange: 27 91% 54%;
     --brand-red-orange: 19 80% 50%;
   }
   * { @apply border-border; }
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-foreground font-sans selection:bg-primary/30;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 }
 @layer components {
-  .md3-card {
-    @apply bg-surface-container-low rounded-3xl shadow-md3-1 transition-all duration-300 hover:shadow-md3-2 hover:bg-surface-container;
+  .terminal-text {
+    @apply font-terminal tracking-tight antialiased;
+    text-shadow: 0 0 2px rgba(243, 128, 32, 0.2);
   }
-  .md3-button {
-    @apply rounded-full px-6 py-2.5 font-medium transition-all duration-200 active:scale-95;
+  .terminal-bg-scanline {
+    position: relative;
+    overflow: hidden;
   }
-  .bg-gradient-mesh {
-    background: radial-gradient(at 0% 0%, hsla(27,91%,54%,0.15) 0px, transparent 50%),
-                radial-gradient(at 100% 0%, hsla(19,80%,50%,0.1) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, hsla(27,91%,54%,0.05) 0px, transparent 50%),
-                radial-gradient(at 0% 100%, hsla(19,80%,50%,0.15) 0px, transparent 50%);
+  .terminal-bg-scanline::after {
+    content: " ";
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+    background-size: 100% 4px, 3px 100%;
+    pointer-events: none;
+    z-index: 50;
+    opacity: 0.1;
+  }
+  .nav-rail-item {
+    @apply flex flex-col items-center justify-center w-full gap-1 p-2 transition-all duration-200;
+  }
+  .nav-rail-indicator {
+    @apply h-8 w-14 rounded-full flex items-center justify-center transition-all duration-300;
+  }
+  .nav-rail-active .nav-rail-indicator {
+    @apply bg-primary/20 text-primary;
+  }
+  .nav-rail-active .nav-rail-label {
+    @apply text-primary font-bold;
   }
 }

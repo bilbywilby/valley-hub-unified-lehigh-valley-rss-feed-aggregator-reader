@@ -1,53 +1,81 @@
 import React from "react";
-import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
+import { Link, useLocation } from "react-router-dom";
+import { Home, Rss, Settings, BarChart3, BookOpen, Fingerprint, ShieldAlert, Cpu } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useLiveQuery } from "dexie-react-hooks";
+import { db } from "@/lib/db";
 import { cn } from "@/lib/utils";
 type AppLayoutProps = {
   children: React.ReactNode;
   container?: boolean;
   className?: string;
-  contentClassName?: string;
 };
-export function AppLayout({ children, container = false, className, contentClassName }: AppLayoutProps): JSX.Element {
+export function AppLayout({ children, container = false, className }: AppLayoutProps): JSX.Element {
+  const location = useLocation();
+  const identity = useLiveQuery(() => db.identity.toCollection().first());
+  const navItems = [
+    { label: "Mesh", path: "/", icon: Home },
+    { label: "Sources", path: "/feeds", icon: Rss },
+    { label: "Metrics", path: "/telemetry", icon: BarChart3 },
+    { label: "Wiki", path: "/docs", icon: BookOpen },
+    { label: "System", path: "/settings", icon: Settings },
+  ];
   return (
-    <SidebarProvider defaultOpen={false}>
-      <AppSidebar />
-      <SidebarInset className={cn("bg-background transition-colors duration-500", className)}>
-        {/* MD3 Header Rail */}
-        <header className="sticky top-0 z-30 flex items-center justify-between px-4 py-3 backdrop-blur-xl bg-background/80 border-b border-border/20 md:px-8">
-          <div className="flex items-center gap-2">
-            <div className="bg-surface-container-high rounded-full p-1 shadow-sm border border-border/40">
-              <SidebarTrigger className="h-10 w-10 rounded-full hover:bg-primary/10 hover:text-primary transition-all active:scale-90" />
-            </div>
-            <div className="hidden sm:block">
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-40 ml-2">Lehigh Valley Network</span>
-            </div>
+    <div className="flex min-h-screen bg-terminal-bg terminal-bg-scanline">
+      {/* M3 Navigation Rail */}
+      <nav className="fixed left-0 top-0 h-full w-20 flex flex-col items-center py-6 bg-surface-container border-r border-border/10 z-50">
+        <div className="mb-10 group">
+          <div className="h-12 w-12 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground font-black text-xl shadow-glow active:scale-95 transition-all">
+            V
           </div>
-          <div className="bg-surface-container-high rounded-full p-1 shadow-sm border border-border/40 flex items-center gap-1">
-            <ThemeToggle className="relative h-10 w-10 top-0 right-0 rounded-full hover:bg-primary/10 hover:text-primary transition-all active:scale-90" />
+        </div>
+        <div className="flex-1 flex flex-col gap-6 w-full">
+          {navItems.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={cn(
+                "nav-rail-item group",
+                location.pathname === item.path ? "nav-rail-active" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <div className="nav-rail-indicator group-hover:bg-surface-variant">
+                <item.icon className="h-6 w-6" />
+              </div>
+              <span className="text-[10px] uppercase font-black tracking-tighter nav-rail-label">
+                {item.label}
+              </span>
+            </Link>
+          ))}
+        </div>
+        <div className="mt-auto flex flex-col items-center gap-6">
+          <div className="flex flex-col items-center gap-1 opacity-50 hover:opacity-100 transition-opacity">
+            <Cpu className="h-5 w-5 text-primary" />
+            <span className="text-[8px] font-mono uppercase font-black">Lattice</span>
           </div>
-        </header>
-        {/* Content Area */}
-        <main className={cn(
-          "flex-1 transition-all duration-300",
-          container && "max-w-[1440px] mx-auto px-4 sm:px-8 lg:px-12 py-10 md:py-16",
-          contentClassName
-        )}>
-          {children}
-        </main>
-        {/* MD3 Footer Guard */}
-        <footer className="py-12 px-8 mt-auto border-t border-border/20">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6 opacity-40">
-            <span className="text-[10px] font-black uppercase tracking-widest">&copy; 2025 Valley Hub Mesh</span>
-            <div className="flex gap-8 text-[10px] font-bold uppercase tracking-widest">
-              <a href="#" className="hover:text-primary transition-colors">Nodes</a>
-              <a href="#" className="hover:text-primary transition-colors">Integrity</a>
-              <a href="#" className="hover:text-primary transition-colors">Privacy</a>
-            </div>
+          <ThemeToggle className="relative top-0 right-0 h-10 w-10 hover:bg-primary/10 rounded-full" />
+          <div className="h-10 w-10 rounded-full bg-surface-container-high border border-border/20 flex items-center justify-center overflow-hidden">
+             {identity ? <Fingerprint className="h-5 w-5 text-primary/50" /> : <ShieldAlert className="h-5 w-5 text-destructive animate-pulse" />}
+          </div>
+        </div>
+      </nav>
+      {/* Main Content Area */}
+      <main className={cn(
+        "flex-1 ml-20 transition-all duration-300",
+        container && "max-w-7xl mx-auto px-6 py-12 md:px-12 md:py-16",
+        className
+      )}>
+        {children}
+        {/* M3 Floating Footer Metadata */}
+        <footer className="mt-20 py-10 border-t border-border/5 opacity-30 flex justify-between items-center text-[10px] font-mono uppercase tracking-[0.2em]">
+          <span>ValleyHub Node v14.0.2 // Status: Secure</span>
+          <div className="flex gap-6">
+            <span>Lat: 40.6139</span>
+            <span>Lng: -75.4778</span>
+            <span>Identity: {identity?.nodeId.slice(0, 8)}...</span>
           </div>
         </footer>
-      </SidebarInset>
-    </SidebarProvider>
+      </main>
+    </div>
   );
 }

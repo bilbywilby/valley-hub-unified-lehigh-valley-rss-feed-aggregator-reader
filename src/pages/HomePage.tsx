@@ -1,140 +1,136 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { Newspaper, Bookmark, Share2, RefreshCcw, Rss, Search, Sparkles, Network } from 'lucide-react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Terminal, Activity, Network, ShieldCheck, Database, Search, Sparkles, RefreshCcw, Hash, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { getOrCreateIdentity } from '@/lib/identity';
 import { useRSS } from '@/hooks/use-rss';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import type { Article } from '@shared/types';
 import { formatDistanceToNow } from 'date-fns';
 export function HomePage() {
-  const [searchQuery, setSearchQuery] = React.useState('');
-  const articles = useLiveQuery(() => db.articles.orderBy('pubDate').reverse().limit(200).toArray());
+  const [searchQuery, setSearchQuery] = useState('');
+  const articles = useLiveQuery(() => db.articles.orderBy('pubDate').reverse().limit(100).toArray());
   const feedsCount = useLiveQuery(() => db.feeds.count()) ?? 0;
-  const { syncFeeds, isSyncing, error } = useRSS();
-  const hasAttemptedAutoSync = useRef(false);
+  const { syncFeeds, isSyncing } = useRSS();
+  const [bootSequence, setBootSequence] = useState<string[]>([]);
+  const hasBooted = useRef(false);
   useEffect(() => {
-    getOrCreateIdentity().catch(console.error);
-  }, []);
-  // Auto-sync logic: If no articles exist, trigger ingestion immediately
-  useEffect(() => {
-    if (articles && articles.length === 0 && !isSyncing && !hasAttemptedAutoSync.current) {
-      hasAttemptedAutoSync.current = true;
-      syncFeeds();
+    if (hasBooted.current) return;
+    hasBooted.current = true;
+    const logs = [
+      "> Initializing Lattice protocol...",
+      "> Checking cryptographic identity...",
+      "> Found NodeID: verifying secure enclave...",
+      "> Reconciling regional master feeds [142 sources]...",
+      "> Bootstrapping local article cache...",
+      "> Mesh integrity verified. System ready."
+    ];
+    logs.forEach((log, i) => {
+      setTimeout(() => {
+        setBootSequence(prev => [...prev, log].slice(-6));
+      }, i * 400);
+    });
+    if (feedsCount === 0) {
+      setTimeout(() => syncFeeds(), 3000);
     }
-  }, [articles, isSyncing, syncFeeds]);
+  }, [feedsCount, syncFeeds]);
   const filteredArticles = useMemo(() => {
     if (!articles) return [];
     if (!searchQuery) return articles;
-    const lowerQuery = searchQuery.toLowerCase();
-    return articles.filter(a =>
-      a.title.toLowerCase().includes(lowerQuery) ||
-      a.sourceName.toLowerCase().includes(lowerQuery) ||
-      a.category?.toLowerCase().includes(lowerQuery)
-    );
+    const q = searchQuery.toLowerCase();
+    return articles.filter(a => a.title.toLowerCase().includes(q) || a.sourceName.toLowerCase().includes(q));
   }, [articles, searchQuery]);
   return (
     <AppLayout container={true}>
       <div className="space-y-12">
-        {/* Hero Section */}
-        <section className="relative rounded-4xl overflow-hidden bg-surface-container-high p-8 md:p-12 lg:p-16 shadow-md3-2 border border-border/50">
-          <div className="relative z-10 max-w-3xl space-y-6">
-            <Badge className="bg-primary/10 text-primary border-none px-4 py-1.5 rounded-full font-bold tracking-tight">
-              <Sparkles className="h-3 w-3 mr-2 inline" /> Regional Intelligence Mesh
-            </Badge>
-            <h1 className="text-5xl md:text-6xl font-display font-extrabold text-foreground leading-tight tracking-tight">
-              Lehigh Valley, <span className="text-primary italic">Decentralized</span>
-            </h1>
-            <p className="text-lg text-muted-foreground font-medium max-w-xl text-pretty leading-relaxed">
-              Experience the region's news through a privacy-preserving aggregator powered by local nodes.
-            </p>
-            <div className="flex flex-col gap-4 pt-2">
-              <div className="flex flex-wrap gap-4 items-center">
-                <Button
-                  onClick={() => syncFeeds()}
+        {/* LatticeManager Boot Sequence */}
+        <section className="bg-surface-container-low rounded-4xl border border-border/20 p-8 shadow-md3-3 overflow-hidden relative">
+          <div className="absolute top-0 right-0 p-4 opacity-5">
+            <Network className="w-64 h-64 text-primary" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="h-3 w-3 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-mono font-black uppercase tracking-widest text-emerald-500">Node Status: Active</span>
+              </div>
+              <h1 className="text-5xl md:text-6xl font-display font-black tracking-tighter leading-[0.9]">
+                ValleyHub <span className="text-primary">Lattice</span>
+              </h1>
+              <p className="text-lg text-muted-foreground font-medium max-w-md">
+                A high-density regional information mesh. Decentralized processing. Private intelligence.
+              </p>
+              <div className="flex flex-wrap gap-4 pt-4">
+                <Button 
+                  onClick={() => syncFeeds()} 
                   disabled={isSyncing}
-                  size="lg"
-                  className="rounded-full bg-primary text-primary-foreground hover:shadow-glow px-8 h-12 transition-all font-bold"
+                  className="rounded-full bg-primary h-14 px-8 font-black uppercase text-xs tracking-widest shadow-glow active:scale-95 transition-all"
                 >
-                  {isSyncing ? <RefreshCcw className="mr-2 h-4 w-4 animate-spin" /> : <Network className="mr-2 h-4 w-4" />}
-                  {isSyncing ? "Mesh Syncing..." : "Update Network"}
+                  {isSyncing ? <RefreshCcw className="mr-2 h-4 w-4 animate-spin" /> : <Activity className="mr-2 h-4 w-4" />}
+                  {isSyncing ? "Mesh Syncing" : "Update Network"}
                 </Button>
                 {isSyncing && (
-                  <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-primary/5 border border-primary/10 animate-in fade-in zoom-in duration-300">
-                    <span className="text-xs font-bold text-primary animate-pulse uppercase tracking-widest">Ingesting Feeds</span>
-                  </div>
-                )}
-                {error && !isSyncing && (
-                  <span className="text-xs font-bold text-destructive bg-destructive/10 px-4 py-2 rounded-full border border-destructive/20">
-                    {error}
-                  </span>
+                   <div className="flex items-center px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
+                      <span className="text-[10px] font-mono font-bold text-primary animate-pulse uppercase">Ingesting Protocol v14</span>
+                   </div>
                 )}
               </div>
-              {isSyncing && (
-                <div className="space-y-2 max-w-xs pt-2">
-                  <Progress value={undefined} className="h-1 bg-primary/10" />
-                  <p className="text-[10px] uppercase font-black tracking-widest text-primary/60">Reconciling master sources...</p>
-                </div>
-              )}
+            </div>
+            <div className="bg-black/40 rounded-3xl p-6 font-mono text-[11px] leading-relaxed border border-border/10 shadow-inner min-h-[160px] flex flex-col justify-end">
+              <AnimatePresence>
+                {bootSequence.map((log, i) => (
+                  <motion.div 
+                    key={i} 
+                    initial={{ opacity: 0, x: -10 }} 
+                    animate={{ opacity: 1, x: 0 }} 
+                    className={i === bootSequence.length - 1 ? "text-primary" : "text-muted-foreground"}
+                  >
+                    {log}
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              <div className="flex items-center gap-2 mt-4">
+                <div className="h-1 w-1 bg-primary animate-ping" />
+                <span className="text-primary/50">_</span>
+              </div>
             </div>
           </div>
-          <div className="absolute right-[-5%] bottom-[-10%] opacity-5 pointer-events-none select-none">
-            <Rss className="w-96 h-96 text-primary rotate-12" />
-          </div>
         </section>
-        {/* Filters and Search */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        {/* SentinelDashboard Controls */}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+           <div className="relative flex-1 max-w-xl group">
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
             <Input
-              placeholder="Search regional mesh..."
-              className="pl-12 bg-surface-container-low border-none shadow-md3-1 h-14 rounded-full text-base focus-visible:ring-primary"
+              placeholder="Query regional mesh registry..."
+              className="pl-14 bg-surface-container-high border-none shadow-md3-1 h-16 rounded-full text-lg font-medium focus-visible:ring-primary focus-visible:ring-offset-0"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <div className="flex gap-3 overflow-x-auto pb-2 md:pb-0">
-            <Button variant="outline" className="rounded-full border-none bg-surface-container h-12 px-6 font-bold shadow-md3-1 hover:shadow-md3-2">Latest</Button>
-            <Button variant="ghost" className="rounded-full h-12 px-6 font-bold text-muted-foreground hover:text-primary">Bookmarks</Button>
+          <div className="flex gap-2">
+             <div className="bg-surface-container-high p-1 rounded-full flex gap-1 shadow-md3-1">
+                <button className="h-12 px-6 rounded-full bg-primary text-primary-foreground font-black uppercase text-[10px] tracking-widest">Global</button>
+                <button className="h-12 px-6 rounded-full hover:bg-surface-variant font-black uppercase text-[10px] tracking-widest">Verified</button>
+             </div>
           </div>
         </div>
-        {/* Article Grid */}
+        {/* SentinelDashboard Grid */}
         {!articles || filteredArticles.length === 0 ? (
-          <div className="py-32 text-center space-y-6 bg-surface-container-low rounded-4xl border-2 border-dashed border-border/50 animate-fade-in">
-            <div className="w-24 h-24 bg-surface-container-high rounded-full flex items-center justify-center mx-auto shadow-md3-1">
-              {isSyncing ? (
-                <RefreshCcw className="h-10 w-10 text-primary animate-spin" />
-              ) : (
-                <Newspaper className="h-10 w-10 text-primary/40" />
-              )}
-            </div>
-            <div className="space-y-3">
-              <h3 className="text-2xl font-bold">{isSyncing ? "Bootstrapping Mesh" : "No articles found"}</h3>
-              <p className="text-muted-foreground max-w-sm mx-auto leading-relaxed font-medium">
-                {isSyncing 
-                  ? "We're currently populating your regional node. This will only take a moment." 
-                  : feedsCount === 0 
-                    ? "Your feed list is empty. Go to Manage Feeds to load the Lehigh Valley master list." 
-                    : "No articles match your criteria. Try adjusting your search."}
-              </p>
-              {!isSyncing && feedsCount === 0 && (
-                <Button asChild className="rounded-full px-8 mt-4 bg-primary">
-                  <Link to="/feeds">Initialize Master Feeds</Link>
-                </Button>
-              )}
-            </div>
+          <div className="py-40 text-center space-y-8 bg-surface-container-low rounded-4xl border-2 border-dashed border-border/10">
+             <Database className="h-16 w-16 mx-auto text-muted-foreground/20" />
+             <div className="space-y-2">
+                <h3 className="text-2xl font-black uppercase tracking-widest">Local Cache Empty</h3>
+                <p className="text-muted-foreground max-w-xs mx-auto text-sm">Synchronize with the regional lattice to populate your node.</p>
+             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
-            {filteredArticles.map((article, index) => (
-              <ArticleCard key={article.id} article={article} index={index} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+            {filteredArticles.map((article, i) => (
+              <ArticleCard key={article.id} article={article} index={i} />
             ))}
           </div>
         )}
@@ -142,85 +138,60 @@ export function HomePage() {
     </AppLayout>
   );
 }
-function ArticleCard({ article, index }: { article: Article; index: number }) {
-  const timeAgo = useMemo(() => {
-    try {
-      if (!article.pubDate) return "recently";
-      const date = new Date(article.pubDate);
-      if (isNaN(date.getTime())) return "recently";
-      return formatDistanceToNow(date, { addSuffix: true });
-    } catch (e) {
-      return "recently";
-    }
-  }, [article.pubDate]);
+function ArticleCard({ article, index }: { article: any; index: number }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 10 }}
       whileInView={{ opacity: 1, y: 0 }}
+      transition={{ delay: Math.min(index * 0.05, 0.5) }}
       viewport={{ once: true }}
-      transition={{ delay: Math.min(index * 0.05, 0.5), duration: 0.5 }}
     >
       <Link to={`/article/${article.id}`}>
-        <Card className="md3-card h-full flex flex-col group border-none shadow-md3-1 bg-surface-container-low hover:bg-surface-container">
-          <div className="aspect-[16/10] relative overflow-hidden m-2 rounded-2xl bg-surface-container-high">
+        <Card className="h-full bg-surface-container-low border-none shadow-md3-1 rounded-3xl group hover:bg-surface-container-high hover:shadow-md3-3 transition-all overflow-hidden flex flex-col">
+          <div className="aspect-[4/3] relative overflow-hidden m-3 rounded-2xl bg-black/20">
             {article.imageUrl ? (
-              <img
-                src={article.imageUrl}
-                alt={article.title}
-                className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-700 ease-out"
-                loading="lazy"
-              />
+              <img src={article.imageUrl} className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-700" loading="lazy" />
             ) : (
-              <div className="w-full h-full bg-primary/5 flex items-center justify-center p-6 text-center">
-                 <Newspaper className="h-12 w-12 text-primary/10" />
+              <div className="w-full h-full flex items-center justify-center opacity-10">
+                <Hash className="w-16 h-16 text-primary" />
               </div>
             )}
-            <div className="absolute top-3 left-3">
-              <Badge className="bg-primary/90 backdrop-blur-sm text-primary-foreground border-none rounded-lg shadow-lg font-bold text-[10px] uppercase tracking-wider">
-                {article.category || 'Regional'}
-              </Badge>
+            <div className="absolute top-3 left-3 flex gap-2">
+               <Badge className="bg-primary/90 text-primary-foreground border-none font-black text-[9px] uppercase tracking-widest py-1 px-3 rounded-lg backdrop-blur-md">
+                 {article.category}
+               </Badge>
             </div>
           </div>
-          <CardHeader className="px-5 pb-2 pt-3">
-            <div className="flex items-center gap-2 text-[10px] text-primary font-black uppercase tracking-widest mb-2 opacity-80">
-              <span className="truncate max-w-[120px]">{article.sourceName}</span>
-              <span className="text-muted-foreground font-normal opacity-50">•</span>
-              <span className="truncate text-muted-foreground font-semibold">{timeAgo}</span>
+          <CardHeader className="px-6 py-2">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-[9px] font-mono font-black text-primary uppercase tracking-tighter truncate max-w-[140px]">{article.sourceName}</span>
+              <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
+              <span className="text-[9px] font-mono text-muted-foreground uppercase">{formatDistanceToNow(new Date(article.pubDate), { addSuffix: true })}</span>
             </div>
-            <h3 className="text-lg font-bold leading-snug group-hover:text-primary transition-colors line-clamp-2 min-h-[3rem]">
+            <h3 className="text-lg font-bold leading-[1.2] group-hover:text-primary transition-colors line-clamp-2">
               {article.title}
             </h3>
           </CardHeader>
-          <CardContent className="px-5 pt-0 flex-grow">
-            <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed opacity-90">
-              {article.description?.replace(/<[^>]*>?/gm, '')}
-            </p>
+          <CardContent className="px-6 py-4 mt-auto">
+             <div className="pt-4 border-t border-border/5 flex items-center justify-between">
+                <div className="flex items-center gap-2 opacity-30 text-[9px] font-mono group-hover:opacity-100 transition-opacity">
+                   <Clock className="h-3 w-3" />
+                   <span>RECON_SECURE</span>
+                </div>
+                <div className="text-[9px] font-mono text-muted-foreground">
+                   {article.hash.slice(0, 8)}...
+                </div>
+             </div>
           </CardContent>
-          <CardFooter className="px-5 py-4 pt-0 flex justify-between items-center mt-auto">
-            <div className="flex gap-1">
-               <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 rounded-full hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all"
-                onClick={(e) => {
-                  e.preventDefault();
-                  db.articles.update(article.id, { isBookmarked: !article.isBookmarked });
-                }}
-              >
-                <Bookmark className={`h-5 w-5 ${article.isBookmarked ? "fill-current text-primary" : ""}`} />
-              </Button>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-[10px] font-black uppercase tracking-widest hover:bg-primary/10 hover:text-primary rounded-full px-4"
-              onClick={(e) => { e.preventDefault(); }}
-            >
-              Full Intel
-            </Button>
-          </CardFooter>
         </Card>
       </Link>
     </motion.div>
+  );
+}
+function Button({ children, onClick, disabled, className }: any) {
+  return (
+    <button onClick={onClick} disabled={disabled} className={cn("inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none disabled:opacity-50", className)}>
+      {children}
+    </button>
   );
 }

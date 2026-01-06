@@ -8,9 +8,6 @@ export default {
   			sans: [
   				'Inter',
   				'-apple-system',
-  				'BlinkMacSystemFont',
-  				'Segoe UI',
-  				'Roboto',
   				'sans-serif'
   			],
 			display: [
@@ -21,70 +18,19 @@ export default {
   			mono: [
   				'JetBrains Mono',
   				'Fira Code',
-  				'Consolas',
   				'monospace'
-  			]
-  		},
-  		fontSize: {
-  			'2xs': [
-  				'0.625rem',
-  				{
-  					lineHeight: '0.75rem'
-  				}
   			],
-  			'3xl': [
-  				'1.875rem',
-  				{
-  					lineHeight: '2.25rem'
-  				}
-  			],
-  			'4xl': [
-  				'2.25rem',
-  				{
-  					lineHeight: '2.5rem'
-  				}
-  			],
-  			'5xl': [
-  				'3rem',
-  				{
-  					lineHeight: '1.1'
-  				}
-  			],
-  			'6xl': [
-  				'3.75rem',
-  				{
-  					lineHeight: '1.1'
-  				}
-  			],
-  			'7xl': [
-  				'4.5rem',
-  				{
-  					lineHeight: '1.1'
-  				}
-  			],
-  			'8xl': [
-  				'6rem',
-  				{
-  					lineHeight: '1'
-  				}
-  			],
-  			'9xl': [
-  				'8rem',
-  				{
-  					lineHeight: '1'
-  				}
-  			]
-  		},
-  		spacing: {
-  			'18': '4.5rem',
-  			'72': '18rem',
-  			'84': '21rem',
-  			'96': '24rem',
-  			'128': '32rem'
+        terminal: [
+          'JetBrains Mono',
+          'Fira Code',
+          'ui-monospace',
+          'monospace'
+        ]
   		},
   		borderRadius: {
   			'3xl': '24px',
-  			'4xl': '28px',
+  			'4xl': '32px',
+        '5xl': '40px',
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
@@ -92,6 +38,11 @@ export default {
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
+        terminal: {
+          bg: '#050508',
+          green: '#4ade80',
+          orange: '#f38020'
+        },
   			brand: {
   				orange: 'hsl(var(--brand-orange))',
   				'red-orange': 'hsl(var(--brand-red-orange))',
@@ -103,6 +54,7 @@ export default {
             low: 'hsl(var(--surface-container-low))',
             DEFAULT: 'hsl(var(--surface-container))',
             high: 'hsl(var(--surface-container-high))',
+            highest: 'hsl(var(--surface-container-highest))',
           }
         },
   			muted: {
@@ -137,22 +89,11 @@ export default {
   				DEFAULT: 'hsl(var(--destructive))',
   				foreground: 'hsl(var(--destructive-foreground))'
   			},
-  			input: 'hsl(var(--input))',
-  			sidebar: {
-  				DEFAULT: 'hsl(var(--sidebar-background))',
-  				foreground: 'hsl(var(--sidebar-foreground))',
-  				primary: 'hsl(var(--sidebar-primary))',
-  				'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-  				accent: 'hsl(var(--sidebar-accent))',
-  				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
-  				border: 'hsl(var(--sidebar-border))',
-  				ring: 'hsl(var(--sidebar-ring))'
-  			}
+  			input: 'hsl(var(--input))'
   		},
   		boxShadow: {
   			soft: '0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04)',
   			glow: '0 0 20px -5px rgba(243, 128, 32, 0.4)',
-  			glass: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
         'md3-1': '0 1px 2px rgba(0,0,0,0.3), 0 1px 3px 1px rgba(0,0,0,0.15)',
         'md3-2': '0 1px 2px rgba(0,0,0,0.3), 0 2px 6px 2px rgba(0,0,0,0.15)',
         'md3-3': '0 4px 8px 3px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.3)',
@@ -160,19 +101,22 @@ export default {
         'md3-5': '0 8px 12px 6px rgba(0,0,0,0.15), 0 4px 4px rgba(0,0,0,0.3)'
   		},
   		keyframes: {
-  			'fade-in': {
-  				'0%': { opacity: '0', transform: 'translateY(10px)' },
-  				'100%': { opacity: '1', transform: 'translateY(0)' }
+  			'scanline': {
+  				'0%': { transform: 'translateY(-100%)' },
+  				'100%': { transform: 'translateY(100%)' }
   			},
-  			'slide-up': {
-  				'0%': { transform: 'translateY(20px)', opacity: '0' },
-  				'100%': { transform: 'translateY(0)', opacity: '1' }
-  			}
+        'flicker': {
+          '0%': { opacity: '0.97' },
+          '5%': { opacity: '0.92' },
+          '10%': { opacity: '0.98' },
+          '15%': { opacity: '0.94' },
+          '20%': { opacity: '0.99' },
+          '100%': { opacity: '1.0' }
+        }
   		},
   		animation: {
-  			'fade-in': 'fade-in 0.3s cubic-bezier(0.2, 0, 0, 1)',
-  			'slide-up': 'slide-up 0.4s cubic-bezier(0.2, 0, 0, 1)',
-  			shimmer: 'shimmer 2s infinite'
+  			'scanline': 'scanline 8s linear infinite',
+  			'flicker': 'flicker 0.15s infinite'
   		}
   	}
   },
