@@ -87,7 +87,8 @@ function runSetupCommands() {
     "bun add swiper@^11.1.14",
     "bun add react-markdown@^9.0.1",
     "bun install dexie-react-hooks dexie",
-    "bun add react-markdown"
+    "bun add react-markdown",
+    "bun add lucide-react date-fns"
 ];
     
     if (commands.length === 0) {
