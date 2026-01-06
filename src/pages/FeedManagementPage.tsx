@@ -143,7 +143,7 @@ function FeedCard({ feed, onRemove }: { feed: any, onRemove: () => void }) {
     };
     fetchStats();
     return () => { isMounted = false; };
-  }, [feed.xmlUrl]);
+  }, [feed.xmlUrl, feed.title]);
   const score = globalStats?.consensusScore ?? feed.quality;
   const delta = Math.abs(score - feed.quality);
   return (

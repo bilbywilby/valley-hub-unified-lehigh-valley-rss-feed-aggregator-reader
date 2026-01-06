@@ -47,6 +47,13 @@ export const DOCS_MAP: Record<string, DocMetadata> = {
     description: 'Future development plans.',
     category: 'Strategic',
     content: `# Implementation Roadmap\n\n- **Current**: Documentation & Mesh Resilience.\n- **Future**: P2P Mesh, Advanced RAG, and Sentiment Analysis.`
+  },
+  'release-notes': {
+    slug: 'release-notes',
+    title: 'System Release v1.0.0',
+    description: 'Architecture, Features, and Deployment manifest.',
+    category: 'Technical',
+    content: `# Valley Hub v1.0.0 Manifest\n\nValley Hub is a modern RSS aggregator for the Lehigh Valley, built with a "Privacy-by-Default" architecture.\n\n### 🚀 Features\n- **Mesh Aggregator**: Unified feed from 140+ regional sources.\n- **Secure Identity**: ECDSA P-256 keys generated on-device; never leaves the browser.\n- **IQS Engine**: Algorithmic scoring of feed quality and density.\n- **Sentinel Proxy**: Privacy-preserving CORS bypass for RSS fetching.\n\n### 🏗️ Architecture\n- **Frontend**: React 18, Tailwind CSS v3, Framer Motion, and Dexie.js (IndexedDB).\n- **Backend**: Cloudflare Workers + Hono.\n- **State**: Global Durable Object for mesh signaling and consensus.\n\n### 📦 Deployment\nValley Hub is optimized for the **Bun + Wrangler** stack.\n\n\`\`\`bash\n# 1. Install dependencies\nbun install\n\n# 2. Local development\nbun run dev\n\n# 3. Production build\nbun run build\n\n# 4. Deploy to Cloudflare\nbun run deploy\n\`\`\`\n\n### 🛡️ Privacy Commitments\n- No centralized user tracking.\n- Local-first article storage.\n- Jittered telemetry coordinates.`
   }
 };
 export const DOCS_LIST = Object.values(DOCS_MAP);

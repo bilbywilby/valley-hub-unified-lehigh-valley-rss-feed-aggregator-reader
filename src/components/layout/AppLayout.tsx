@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Rss, Settings, BarChart3, BookOpen, Fingerprint, ShieldAlert, Cpu, Search, Wifi, Activity } from "lucide-react";
+import { Home, Rss, Settings, BarChart3, BookOpen, Fingerprint, ShieldAlert, Cpu, Search, Wifi } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 type AppLayoutProps = {
-  children: React.ReactNode;
+  children: React.InnerComponent | React.ReactNode;
   container?: boolean;
   className?: string;
 };
@@ -21,7 +21,6 @@ export function AppLayout({ children, container = false, className }: AppLayoutP
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-  // Simulate network indicator logic
   useEffect(() => {
     const interval = setInterval(() => {
       const rand = Math.random();
@@ -49,7 +48,7 @@ export function AppLayout({ children, container = false, className }: AppLayoutP
           ? "bg-background/85 backdrop-blur-2xl border-border/10 py-3 shadow-md3-2"
           : "bg-transparent border-transparent py-5"
       )}>
-        <div className="max-w-7xl mx-auto px-6 md:px-12 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container-high/50 border border-border/10">
               <div className={cn(
@@ -133,12 +132,12 @@ export function AppLayout({ children, container = false, className }: AppLayoutP
       {/* Main Content Area */}
       <main className={cn(
         "flex-1 ml-20 mt-16 transition-all duration-300 min-h-screen",
-        container && "max-w-7xl mx-auto px-6 py-12 md:px-12 md:py-12",
+        container ? "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10 lg:py-12" : "",
         className
       )}>
         {children}
         <footer className="mt-20 py-10 border-t border-border/5 opacity-30 flex flex-col md:flex-row justify-between items-center gap-6 text-[10px] font-mono uppercase tracking-[0.2em] terminal-text">
-          <span className="font-black">ValleyHub Node v15.0.0 // SIG_STATUS: SECURE_ENCLAVE_READY</span>
+          <span className="font-black">ValleyHub Node v1.0.0 // SIG_STATUS: SECURE_ENCLAVE_READY</span>
           <div className="flex flex-wrap justify-center gap-6 md:gap-8">
             <span className="flex gap-2">LAT: <span className="text-primary font-black">40.6139</span></span>
             <span className="flex gap-2">LNG: <span className="text-primary font-black">-75.4778</span></span>
