@@ -5,9 +5,11 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Shield, Fingerprint, Database, Trash2, Copy, Cpu, Activity, Info } from 'lucide-react';
+import { Shield, Fingerprint, Database, Trash2, Copy, Cpu, Activity } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 export function SettingsPage() {
   const identity = useLiveQuery(() => db.identity.toCollection().first());
   const geoEnabled = useLiveQuery(() => db.settings.get('geo_jitter_enabled'))?.value ?? true;
@@ -17,7 +19,6 @@ export function SettingsPage() {
     if (!canvasRef.current) return;
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
-    // Simple jitter visualization
     const width = canvasRef.current.width;
     const height = canvasRef.current.height;
     ctx.clearRect(0, 0, width, height);
@@ -52,7 +53,6 @@ export function SettingsPage() {
           <p className="text-muted-foreground text-lg max-w-2xl font-medium">Manage cryptographic identity and mesh privacy parameters.</p>
         </header>
         <div className="grid grid-cols-1 gap-8">
-          {/* Cryptographic Identity Manifest */}
           <Card className="bg-surface-container-low border-none shadow-md3-2 rounded-4xl overflow-hidden">
             <CardHeader className="bg-surface-container-high/50 p-8 border-b border-border/10">
               <div className="flex justify-between items-start">
@@ -87,7 +87,6 @@ export function SettingsPage() {
               </div>
             </CardContent>
           </Card>
-          {/* Privacy & Jitter Configuration */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
              <Card className="bg-surface-container-low border-none shadow-md3-1 rounded-4xl">
                 <CardHeader className="p-8">
@@ -153,18 +152,4 @@ export function SettingsPage() {
       </div>
     </AppLayout>
   );
-}
-function Button({ children, onClick, variant = "primary", size = "default", className }: any) {
-    const base = "inline-flex items-center justify-center rounded-md transition-colors disabled:opacity-50 focus:outline-none";
-    const variants: any = {
-        primary: "bg-primary text-primary-foreground hover:bg-primary/90",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-    };
-    return (
-        <button onClick={onClick} className={cn(base, variants[variant], className)}>
-            {children}
-        </button>
-    );
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Terminal, Activity, Network, ShieldCheck, Database, Search, Sparkles, RefreshCcw, Hash, Clock } from 'lucide-react';
+import { Activity, Network, Database, Search, RefreshCcw, Hash, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
@@ -9,8 +9,9 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
+import { cn } from '@/lib/utils';
 export function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const articles = useLiveQuery(() => db.articles.orderBy('pubDate').reverse().limit(100).toArray());
@@ -47,7 +48,6 @@ export function HomePage() {
   return (
     <AppLayout container={true}>
       <div className="space-y-12">
-        {/* LatticeManager Boot Sequence */}
         <section className="bg-surface-container-low rounded-4xl border border-border/20 p-8 shadow-md3-3 overflow-hidden relative">
           <div className="absolute top-0 right-0 p-4 opacity-5">
             <Network className="w-64 h-64 text-primary" />
@@ -65,8 +65,8 @@ export function HomePage() {
                 A high-density regional information mesh. Decentralized processing. Private intelligence.
               </p>
               <div className="flex flex-wrap gap-4 pt-4">
-                <Button 
-                  onClick={() => syncFeeds()} 
+                <Button
+                  onClick={() => syncFeeds()}
                   disabled={isSyncing}
                   className="rounded-full bg-primary h-14 px-8 font-black uppercase text-xs tracking-widest shadow-glow active:scale-95 transition-all"
                 >
@@ -83,11 +83,14 @@ export function HomePage() {
             <div className="bg-black/40 rounded-3xl p-6 font-mono text-[11px] leading-relaxed border border-border/10 shadow-inner min-h-[160px] flex flex-col justify-end">
               <AnimatePresence>
                 {bootSequence.map((log, i) => (
-                  <motion.div 
-                    key={i} 
-                    initial={{ opacity: 0, x: -10 }} 
-                    animate={{ opacity: 1, x: 0 }} 
-                    className={i === bootSequence.length - 1 ? "text-primary" : "text-muted-foreground"}
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className={cn(
+                      "terminal-text",
+                      i === bootSequence.length - 1 ? "text-primary" : "text-muted-foreground"
+                    )}
                   >
                     {log}
                   </motion.div>
@@ -100,7 +103,6 @@ export function HomePage() {
             </div>
           </div>
         </section>
-        {/* SentinelDashboard Controls */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
            <div className="relative flex-1 max-w-xl group">
             <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
@@ -113,12 +115,11 @@ export function HomePage() {
           </div>
           <div className="flex gap-2">
              <div className="bg-surface-container-high p-1 rounded-full flex gap-1 shadow-md3-1">
-                <button className="h-12 px-6 rounded-full bg-primary text-primary-foreground font-black uppercase text-[10px] tracking-widest">Global</button>
-                <button className="h-12 px-6 rounded-full hover:bg-surface-variant font-black uppercase text-[10px] tracking-widest">Verified</button>
+                <Button variant="ghost" className="h-12 px-6 rounded-full bg-primary text-primary-foreground font-black uppercase text-[10px] tracking-widest hover:bg-primary/90">Global</Button>
+                <Button variant="ghost" className="h-12 px-6 rounded-full hover:bg-surface-variant font-black uppercase text-[10px] tracking-widest">Verified</Button>
              </div>
           </div>
         </div>
-        {/* SentinelDashboard Grid */}
         {!articles || filteredArticles.length === 0 ? (
           <div className="py-40 text-center space-y-8 bg-surface-container-low rounded-4xl border-2 border-dashed border-border/10">
              <Database className="h-16 w-16 mx-auto text-muted-foreground/20" />
@@ -186,12 +187,5 @@ function ArticleCard({ article, index }: { article: any; index: number }) {
         </Card>
       </Link>
     </motion.div>
-  );
-}
-function Button({ children, onClick, disabled, className }: any) {
-  return (
-    <button onClick={onClick} disabled={disabled} className={cn("inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none disabled:opacity-50", className)}>
-      {children}
-    </button>
   );
 }

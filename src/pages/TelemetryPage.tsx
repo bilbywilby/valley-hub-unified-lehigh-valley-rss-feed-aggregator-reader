@@ -2,13 +2,13 @@ import React, { useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, Title, AreaChart, BarChart, Text, Metric, Flex, Badge, Grid, Col, Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell } from '@tremor/react';
-import { Activity, Zap, Newspaper, Rss, Network, ShieldCheck, Cpu } from 'lucide-react';
+import { Card, Title, AreaChart, BarChart, Text, Metric, Flex, Badge, Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell } from '@tremor/react';
+import { Activity, Zap, Newspaper, Rss, ShieldCheck } from 'lucide-react';
 import { subDays, format } from 'date-fns';
+import { cn } from '@/lib/utils';
 export function TelemetryPage() {
   const articles = useLiveQuery(() => db.articles.toArray());
   const feeds = useLiveQuery(() => db.feeds.toArray());
-  const telemetry = useLiveQuery(() => db.telemetry.toArray());
   const chartData = useMemo(() => {
     if (!articles) return [];
     const last7Days = Array.from({ length: 7 }, (_, i) => format(subDays(new Date(), i), 'MMM dd')).reverse();
@@ -20,8 +20,13 @@ export function TelemetryPage() {
   const sourceData = useMemo(() => {
     if (!articles) return [];
     const counts: Record<string, number> = {};
-    articles.forEach(a => counts[a.sourceName] = (counts[a.sourceName] || 0) + 1);
-    return Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 10);
+    articles.forEach(a => {
+      counts[a.sourceName] = (counts[a.sourceName] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
   }, [articles]);
   return (
     <AppLayout container={true}>
@@ -33,7 +38,7 @@ export function TelemetryPage() {
           </div>
           <p className="text-muted-foreground text-lg max-w-2xl font-medium">Real-time telemetry from the regional intelligence lattice.</p>
         </header>
-        <Grid numItemsMd={2} numItemsLg={4} className="gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card decoration="top" decorationColor="orange" className="bg-surface-container-low border-none shadow-md3-1">
             <Flex alignItems="start">
               <Text className="font-mono text-xs uppercase font-black opacity-50">Lattice Density</Text>
@@ -62,24 +67,24 @@ export function TelemetryPage() {
             </Flex>
             <Metric className="font-display font-black">12.4/m</Metric>
           </Card>
-        </Grid>
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <Card className="lg:col-span-8 bg-surface-container-low border-none shadow-md3-1">
             <Title className="font-mono text-sm uppercase font-black">Mesh Processing Ingestion (Last 7 Days)</Title>
             <AreaChart
-              className="mt-8 h-80"
+              className="mt-8 h-80 terminal-text"
               data={chartData}
               index="date"
               categories={["Mesh Processing Volume"]}
               colors={["orange"]}
               showAnimation={true}
-              curveType="monotone"
+              curveType="natural"
             />
           </Card>
           <Card className="lg:col-span-4 bg-surface-container-low border-none shadow-md3-1">
             <Title className="font-mono text-sm uppercase font-black">Top Stream Providers</Title>
             <BarChart
-              className="mt-8 h-80"
+              className="mt-8 h-80 terminal-text"
               data={sourceData}
               index="name"
               categories={["count"]}
@@ -113,7 +118,7 @@ export function TelemetryPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right px-6 py-4">
-                    <Text className="font-mono font-black text-primary">{item.quality}.00%</Text>
+                    <Text className={cn("font-mono font-black text-primary", "terminal-text")}>{item.quality}.00%</Text>
                   </TableCell>
                 </TableRow>
               ))}
