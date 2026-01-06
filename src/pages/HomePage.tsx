@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Network, Database, Search, RefreshCcw, Hash, Clock } from 'lucide-react';
+import { Activity, Network, Database, RefreshCcw, Hash, Clock, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
@@ -8,94 +8,128 @@ import { useRSS } from '@/hooks/use-rss';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+function LatticeMesh({ active }: { active: boolean }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    let animationFrame: number;
+    const nodes = Array.from({ length: 40 }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 0.5,
+      vy: (Math.random() - 0.5) * 0.5,
+      pulse: Math.random() * Math.PI,
+    }));
+    const render = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = active ? 'rgba(243, 128, 32, 0.2)' : 'rgba(255, 255, 255, 0.05)';
+      ctx.lineWidth = 0.5;
+      nodes.forEach((node, i) => {
+        node.x += node.vx * (active ? 2 : 1);
+        node.y += node.vy * (active ? 2 : 1);
+        node.pulse += 0.02;
+        if (node.x < 0 || node.x > canvas.width) node.vx *= -1;
+        if (node.y < 0 || node.y > canvas.height) node.vy *= -1;
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = active ? `rgba(243, 128, 32, ${0.3 + Math.sin(node.pulse) * 0.2})` : 'rgba(255, 255, 255, 0.1)';
+        ctx.fill();
+        for (let j = i + 1; j < nodes.length; j++) {
+          const other = nodes[j];
+          const dist = Math.hypot(node.x - other.x, node.y - other.y);
+          if (dist < 100) {
+            ctx.beginPath();
+            ctx.moveTo(node.x, node.y);
+            ctx.lineTo(other.x, other.y);
+            ctx.globalAlpha = (1 - dist / 100) * (active ? 0.8 : 0.3);
+            ctx.stroke();
+          }
+        }
+      });
+      animationFrame = requestAnimationFrame(render);
+    };
+    render();
+    return () => cancelAnimationFrame(animationFrame);
+  }, [active]);
+  return <canvas ref={canvasRef} width={800} height={400} className="absolute inset-0 w-full h-full pointer-events-none opacity-60" />;
+}
 export function HomePage() {
-  const [searchQuery, setSearchQuery] = useState('');
   const articles = useLiveQuery(() => db.articles.orderBy('pubDate').reverse().limit(100).toArray());
   const feedsCount = useLiveQuery(() => db.feeds.count()) ?? 0;
   const { syncFeeds, isSyncing, error } = useRSS();
   const [bootSequence, setBootSequence] = useState<string[]>([]);
   const hasBooted = useRef(false);
   useEffect(() => {
-    if (error) {
-      toast.error(error);
-    }
+    if (error) toast.error(error);
   }, [error]);
   useEffect(() => {
     if (hasBooted.current) return;
     hasBooted.current = true;
     const logs = [
-      "> Initializing Lattice protocol...",
-      "> Checking cryptographic identity...",
-      "> Found NodeID: verifying secure enclave...",
-      "> Reconciling regional master feeds [142 sources]...",
-      articles && articles.length > 0 ? "> Local cache verified: regional data ready." : "> Local cache empty: mesh sync required.",
-      "> Mesh integrity verified. System ready."
+      "> LATTICE_PROTO_V2: Initializing...",
+      "> ENCLAVE_V2_LOADED: Secure Shard Verified.",
+      "> REGIONAL_MESH: Reconciling master streams...",
+      "> SHARD_CONSENSUS: STABLE [Nodes: 14]",
+      articles && articles.length > 0 ? "> CACHE_RECON: Local registry synchronized." : "> CACHE_NULL: Sync mandatory.",
+      "> SYSTEM_READY: Integrity verified."
     ];
     logs.forEach((log, i) => {
       setTimeout(() => {
         setBootSequence(prev => [...prev, log].slice(-6));
-      }, i * 400);
+      }, i * 350);
     });
-    if (feedsCount === 0) {
-      setTimeout(() => syncFeeds(), 3000);
-    }
+    if (feedsCount === 0) setTimeout(() => syncFeeds(), 3000);
   }, [feedsCount, syncFeeds, articles]);
-  const filteredArticles = useMemo(() => {
-    if (!articles) return [];
-    if (!searchQuery) return articles;
-    const q = searchQuery.toLowerCase();
-    return articles.filter(a => a.title.toLowerCase().includes(q) || a.sourceName.toLowerCase().includes(q));
-  }, [articles, searchQuery]);
   return (
     <AppLayout container={true}>
       <div className="space-y-12">
-        <section className="bg-surface-container-low rounded-4xl border border-border/20 p-8 shadow-md3-3 overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-4 opacity-5">
-            <Network className="w-64 h-64 text-primary" />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-6">
+        <section className="bg-surface-container-low rounded-4xl border border-border/10 p-10 shadow-md3-3 overflow-hidden relative min-h-[400px] flex items-center">
+          <LatticeMesh active={isSyncing} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10 w-full">
+            <div className="space-y-8">
               <div className="flex items-center gap-3">
-                <div className="h-3 w-3 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] font-mono font-black uppercase tracking-widest text-emerald-500">Node Status: Active</span>
+                <div className="h-3 w-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                <span className="text-[10px] font-mono font-black uppercase tracking-[0.2em] text-emerald-500">Lattice v2 // Active</span>
               </div>
-              <h1 className="text-5xl md:text-6xl font-display font-black tracking-tighter leading-[0.9]">
-                ValleyHub <span className="text-primary">Lattice</span>
+              <h1 className="text-6xl md:text-7xl font-display font-black tracking-tighter leading-[0.85] uppercase">
+                Valley <span className="text-primary">Lattice</span>
               </h1>
-              <p className="text-lg text-muted-foreground font-medium max-w-md">
-                A high-density regional information mesh. Decentralized processing. Private intelligence.
+              <p className="text-xl text-muted-foreground font-medium max-w-md leading-relaxed">
+                A high-density regional intelligence mesh. Distributed processing. Absolute privacy.
               </p>
               <div className="flex flex-wrap gap-4 pt-4">
                 <Button
                   onClick={() => syncFeeds(true)}
                   disabled={isSyncing}
-                  className="rounded-full bg-primary h-14 px-8 font-black uppercase text-xs tracking-widest shadow-glow active:scale-95 transition-all"
+                  className="rounded-full bg-primary h-16 px-10 font-black uppercase text-xs tracking-widest shadow-glow active:scale-95 transition-all group"
                 >
-                  {isSyncing ? <RefreshCcw className="mr-2 h-4 w-4 animate-spin" /> : <Activity className="mr-2 h-4 w-4" />}
-                  {isSyncing ? "Mesh Syncing" : "Update Network"}
+                  {isSyncing ? <RefreshCcw className="mr-3 h-5 w-5 animate-spin" /> : <Activity className="mr-3 h-5 w-5 group-hover:rotate-12 transition-transform" />}
+                  {isSyncing ? "Mesh Syncing..." : "Update Network"}
                 </Button>
                 {isSyncing && (
-                   <div className="flex items-center px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
-                      <span className="text-[10px] font-mono font-bold text-primary animate-pulse uppercase">Ingesting Protocol v14</span>
+                   <div className="flex items-center px-6 py-2 rounded-full bg-primary/10 border border-primary/20 backdrop-blur-md">
+                      <span className="text-[10px] font-mono font-bold text-primary animate-pulse uppercase tracking-widest">Protocol v14_Ingesting</span>
                    </div>
                 )}
               </div>
             </div>
-            <div className="bg-black/40 rounded-3xl p-6 font-mono text-[11px] leading-relaxed border border-border/10 shadow-inner min-h-[160px] flex flex-col justify-end">
+            <div className="bg-black/60 backdrop-blur-md rounded-3xl p-8 font-mono text-[11px] leading-relaxed border border-border/10 shadow-2xl min-h-[200px] flex flex-col justify-end">
               <AnimatePresence>
                 {bootSequence.map((log, i) => (
                   <motion.div
                     key={i}
-                    initial={{ opacity: 0, x: -10 }}
+                    initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     className={cn(
-                      "terminal-text",
-                      i === bootSequence.length - 1 ? "text-primary" : "text-muted-foreground"
+                      "terminal-text py-0.5",
+                      i === bootSequence.length - 1 ? "text-primary font-bold" : "text-muted-foreground/80"
                     )}
                   >
                     {log}
@@ -103,40 +137,23 @@ export function HomePage() {
                 ))}
               </AnimatePresence>
               <div className="flex items-center gap-2 mt-4">
-                <div className="h-1 w-1 bg-primary animate-ping" />
-                <span className="text-primary/50">_</span>
+                <div className="h-1.5 w-1.5 bg-primary animate-ping" />
+                <span className="text-primary/50 text-sm">_</span>
               </div>
             </div>
           </div>
         </section>
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-           <div className="relative flex-1 max-w-xl group">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-            <Input
-              placeholder="Query regional mesh registry..."
-              className="pl-14 bg-surface-container-high border-none shadow-md3-1 h-16 rounded-full text-lg font-medium focus-visible:ring-primary focus-visible:ring-offset-0"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <div className="flex gap-2">
-             <div className="bg-surface-container-high p-1 rounded-full flex gap-1 shadow-md3-1">
-                <Button variant="ghost" className="h-12 px-6 rounded-full bg-primary text-primary-foreground font-black uppercase text-[10px] tracking-widest hover:bg-primary/90">Global</Button>
-                <Button variant="ghost" className="h-12 px-6 rounded-full hover:bg-surface-variant font-black uppercase text-[10px] tracking-widest">Verified</Button>
-             </div>
-          </div>
-        </div>
-        {!articles || filteredArticles.length === 0 ? (
+        {!articles || articles.length === 0 ? (
           <div className="py-40 text-center space-y-8 bg-surface-container-low rounded-4xl border-2 border-dashed border-border/10">
              <Database className="h-16 w-16 mx-auto text-muted-foreground/20" />
              <div className="space-y-2">
-                <h3 className="text-2xl font-black uppercase tracking-widest">Local Cache Empty</h3>
+                <h3 className="text-2xl font-black uppercase tracking-widest">Local Registry Empty</h3>
                 <p className="text-muted-foreground max-w-xs mx-auto text-sm">Synchronize with the regional lattice to populate your node.</p>
              </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-            {filteredArticles.map((article, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {articles.map((article, i) => (
               <ArticleCard key={article.id} article={article} index={i} />
             ))}
           </div>
@@ -148,9 +165,9 @@ export function HomePage() {
 function ArticleCard({ article, index }: { article: any; index: number }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 15 }}
       whileInView={{ opacity: 1, y: 0 }}
-      transition={{ delay: Math.min(index * 0.05, 0.5) }}
+      transition={{ delay: Math.min(index * 0.04, 0.4) }}
       viewport={{ once: true }}
     >
       <Link to={`/article/${article.id}`}>
@@ -171,9 +188,9 @@ function ArticleCard({ article, index }: { article: any; index: number }) {
           </div>
           <CardHeader className="px-6 py-2">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-[9px] font-mono font-black text-primary uppercase tracking-tighter truncate max-w-[140px]">{article.sourceName}</span>
+              <span className="text-[10px] font-mono font-black text-primary uppercase tracking-tighter truncate max-w-[140px]">{article.sourceName}</span>
               <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
-              <span className="text-[9px] font-mono text-muted-foreground uppercase">{formatDistanceToNow(new Date(article.pubDate), { addSuffix: true })}</span>
+              <span className="text-[10px] font-mono text-muted-foreground uppercase">{formatDistanceToNow(new Date(article.pubDate), { addSuffix: true })}</span>
             </div>
             <h3 className="text-lg font-bold leading-[1.2] group-hover:text-primary transition-colors line-clamp-2">
               {article.title}
@@ -182,11 +199,11 @@ function ArticleCard({ article, index }: { article: any; index: number }) {
           <CardContent className="px-6 py-4 mt-auto">
              <div className="pt-4 border-t border-border/5 flex items-center justify-between">
                 <div className="flex items-center gap-2 opacity-30 text-[9px] font-mono group-hover:opacity-100 transition-opacity">
-                   <Clock className="h-3 w-3" />
-                   <span>RECON_SECURE</span>
+                   <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                   <span>ENCLAVE_SYNC</span>
                 </div>
-                <div className="text-[9px] font-mono text-muted-foreground">
-                   {article.hash.slice(0, 8)}...
+                <div className="text-[9px] font-mono text-muted-foreground opacity-50">
+                   {article.hash.slice(0, 10)}
                 </div>
              </div>
           </CardContent>
