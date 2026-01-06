@@ -10,11 +10,24 @@ export interface UserIdentity {
   publicJwk: string;
   createdAt: number;
 }
+export interface TelemetryEvent {
+  id?: number;
+  event: string;
+  payload: any;
+  timestamp: number;
+  synced: number; // 0 for no, 1 for yes
+}
+export interface UserSetting {
+  key: string;
+  value: any;
+}
 export class ValleyHubDB extends Dexie {
   articles!: Table<Article>;
   feeds!: Table<Feed>;
   identity!: Table<UserIdentity>;
   config!: Table<AppConfig>;
+  telemetry!: Table<TelemetryEvent>;
+  settings!: Table<UserSetting>;
   constructor() {
     super('ValleyHubDB');
     this.version(1).stores({
@@ -22,6 +35,10 @@ export class ValleyHubDB extends Dexie {
       feeds: 'id, xmlUrl, category, quality',
       identity: '++id, nodeId',
       config: 'key'
+    });
+    this.version(2).stores({
+      telemetry: '++id, event, timestamp, synced',
+      settings: 'key'
     });
   }
 }

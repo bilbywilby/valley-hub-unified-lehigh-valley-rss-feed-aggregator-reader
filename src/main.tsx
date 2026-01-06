@@ -14,7 +14,8 @@ import '@/index.css'
 import { HomePage } from '@/pages/HomePage'
 import { FeedManagementPage } from '@/pages/FeedManagementPage'
 import { ArticleDetailPage } from '@/pages/ArticleDetailPage'
-import { ComingSoonPage } from '@/pages/ComingSoonPage'
+import { SettingsPage } from '@/pages/SettingsPage'
+import { TelemetryPage } from '@/pages/TelemetryPage'
 const queryClient = new QueryClient();
 const router = createBrowserRouter([
   {
@@ -34,12 +35,12 @@ const router = createBrowserRouter([
   },
   {
     path: "/telemetry",
-    element: <ComingSoonPage title="Telemetry Dashboard" />,
+    element: <TelemetryPage />,
     errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/settings",
-    element: <ComingSoonPage title="Settings & Privacy" />,
+    element: <SettingsPage />,
     errorElement: <RouteErrorBoundary />,
   },
 ]);

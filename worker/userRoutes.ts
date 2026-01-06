@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { Env } from './core-utils';
 import type { Article, Feed } from '@shared/types';
 export function userRoutes(app: Hono<{ Bindings: Env }>) {
-    // Utility for stub access
     const getStub = (c: any) => c.env.GlobalDurableObject.get(c.env.GlobalDurableObject.idFromName("global"));
     app.get('/api/articles', async (c) => {
         const data = await getStub(c).getArticles();
@@ -26,6 +25,15 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         } catch (err) {
             return c.json({ success: false, error: 'Fetch failed' }, 500);
         }
+    });
+    app.post('/api/telemetry', async (c) => {
+        const body = await c.req.json();
+        await getStub(c).recordTelemetryBatch(body.events);
+        return c.json({ success: true });
+    });
+    app.get('/api/network/status', async (c) => {
+        const stats = await getStub(c).getNetworkStats();
+        return c.json({ success: true, data: stats });
     });
     app.post('/api/register', async (c) => {
         const body = await c.req.json();

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
+import { useTelemetry } from '@/hooks/use-telemetry';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Bookmark, Share2, Calendar, Globe, ExternalLink } from 'lucide-react';
@@ -11,6 +12,16 @@ export function ArticleDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const article = useLiveQuery(() => db.articles.get(id || ''), [id]);
+  const { trackEvent } = useTelemetry();
+  useEffect(() => {
+    if (article) {
+      trackEvent('ARTICLE_VIEW', { 
+        articleId: article.id, 
+        source: article.sourceName,
+        category: article.category 
+      });
+    }
+  }, [article, trackEvent]);
   if (!article) {
     return (
       <AppLayout container={true}>
@@ -71,6 +82,7 @@ export function ArticleDetailPage() {
               variant="outline" 
               onClick={async () => {
                 await db.articles.update(article.id, { isBookmarked: !article.isBookmarked });
+                if (!article.isBookmarked) trackEvent('BOOKMARK_ADD', { articleId: article.id });
               }}
               className={article.isBookmarked ? "bg-accent" : ""}
             >

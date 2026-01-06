@@ -11,7 +11,7 @@ export class GlobalDurableObject extends DurableObject {
     }
     async addArticle(article: Article): Promise<Article[]> {
         const items = await this.getArticles();
-        const updated = [article, ...items].slice(0, 1000); // Keep last 1000
+        const updated = [article, ...items].slice(0, 1000);
         await this.ctx.storage.put("articles", updated);
         return updated;
     }
@@ -34,28 +34,40 @@ export class GlobalDurableObject extends DurableObject {
         await this.ctx.storage.put("feeds", updated);
         return updated;
     }
+    // Telemetry & Network Stats
+    async recordTelemetryBatch(events: any[]): Promise<void> {
+        const date = new Date().toISOString().split('T')[0];
+        const key = `telemetry_${date}`;
+        const existing: any[] = (await this.ctx.storage.get(key)) || [];
+        const updated = [...existing, ...events].slice(-2000); // Keep last 2k events per day
+        await this.ctx.storage.put(key, updated);
+    }
+    async getNetworkStats(): Promise<any> {
+        const nodes = await this.ctx.storage.list({ prefix: "node_" });
+        const now = Date.now();
+        let activeCount = 0;
+        nodes.forEach((val: any) => {
+            if (now - val.lastSeen < 3600000) activeCount++;
+        });
+        return {
+            totalNodes: nodes.size,
+            activeNodes: activeCount,
+            timestamp: now
+        };
+    }
     // Signaling & Registry
     async registerNode(nodeId: string, metadata: any): Promise<void> {
         await this.ctx.storage.put(`node_${nodeId}`, { ...metadata, lastSeen: Date.now() });
     }
     async storeOffer(targetNodeId: string, offer: any): Promise<void> {
-        await this.ctx.storage.put(`offer_${targetNodeId}`, offer);
+        await this.ctx.storage.put(`offer_${targetNodeId}`, { ...offer, createdAt: Date.now() });
     }
     async getOffer(targetNodeId: string): Promise<any> {
-        return await this.ctx.storage.get(`offer_${targetNodeId}`);
-    }
-    // Legacy/Demo Support
-    async getCounterValue(): Promise<number> {
-      return (await this.ctx.storage.get("counter_value")) || 0;
-    }
-    async increment(amount = 1): Promise<number> {
-      let value: number = (await this.ctx.storage.get("counter_value")) || 0;
-      value += amount;
-      await this.ctx.storage.put("counter_value", value);
-      return value;
-    }
-    async getDemoItems(): Promise<DemoItem[]> {
-      const items = await this.ctx.storage.get("demo_items");
-      return (items as DemoItem[]) || [];
+        const offer: any = await this.ctx.storage.get(`offer_${targetNodeId}`);
+        if (offer && Date.now() - offer.createdAt > 300000) { // 5 min TTL
+            await this.ctx.storage.delete(`offer_${targetNodeId}`);
+            return null;
+        }
+        return offer;
     }
 }
