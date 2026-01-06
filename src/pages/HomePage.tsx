@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Newspaper, ChevronRight, Bookmark, Share2, Clock, Globe, RefreshCcw } from 'lucide-react';
+import { Newspaper, ChevronRight, Bookmark, Share2, Clock, Globe, RefreshCcw, Rss } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
@@ -109,19 +109,19 @@ function ArticleCard({ article, index }: { article: Article; index: number }) {
               />
             )}
             <Badge className="absolute top-3 left-3 bg-brand-orange/90 text-white backdrop-blur-sm border-none">
-              {article.category}
+              {article.category || 'News'}
             </Badge>
           </div>
           <CardHeader className="p-5 pb-2">
             <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-2 uppercase font-bold tracking-tight">
               <Globe className="h-3 w-3" />
-              <span>{article.sourceName}</span>
+              <span>{article.sourceName || 'Unknown'}</span>
               <span>•</span>
               <Clock className="h-3 w-3" />
-              <span>{formatDistanceToNow(new Date(article.pubDate))} ago</span>
+              <span>{formatDistanceToNow(new Date(article.pubDate || 0))} ago</span>
             </div>
             <h3 className="text-lg font-bold leading-snug group-hover:text-brand-orange transition-colors line-clamp-2">
-              {article.title}
+              {article.title || 'No title'}
             </h3>
           </CardHeader>
           <CardContent className="p-5 pt-0 flex-grow">
@@ -136,10 +136,10 @@ function ArticleCard({ article, index }: { article: Article; index: number }) {
               className="h-8 w-8 text-muted-foreground hover:text-brand-orange"
               onClick={(e) => {
                 e.preventDefault();
-                db.articles.update(article.id, { isBookmarked: !article.isBookmarked });
+                db.articles.update(article.id, { isBookmarked: !(article.isBookmarked === true) });
               }}
             >
-              <Bookmark className={`h-4 w-4 ${article.isBookmarked ? "fill-current" : ""}`} />
+              <Bookmark className={`h-4 w-4 ${article.isBookmarked === true ? "fill-current" : ""}`} />
             </Button>
             <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-brand-orange">
               <Share2 className="h-4 w-4" />
@@ -150,4 +150,3 @@ function ArticleCard({ article, index }: { article: Article; index: number }) {
     </motion.div>
   );
 }
-import { Rss } from 'lucide-react';
