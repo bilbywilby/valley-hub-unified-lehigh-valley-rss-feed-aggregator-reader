@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Newspaper, Bookmark, Share2, Clock, Globe, RefreshCcw, Rss, Search, Sparkles } from 'lucide-react';
+import { Newspaper, Bookmark, Share2, RefreshCcw, Rss, Search, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
@@ -19,15 +19,17 @@ export function HomePage() {
   const articles = useLiveQuery(() => db.articles.orderBy('pubDate').reverse().limit(200).toArray());
   const feedsCount = useLiveQuery(() => db.feeds.count()) ?? 0;
   const { syncFeeds, isSyncing } = useRSS();
+  const hasAttemptedAutoSync = useRef(false);
   useEffect(() => {
     getOrCreateIdentity();
   }, []);
   // Auto-sync on first run if articles are empty but feeds exist
   useEffect(() => {
-    if (articles && articles.length === 0 && feedsCount > 0 && !isSyncing) {
+    if (articles && articles.length === 0 && feedsCount > 0 && !isSyncing && !hasAttemptedAutoSync.current) {
+      hasAttemptedAutoSync.current = true;
       syncFeeds();
     }
-  }, [articles?.length, feedsCount]);
+  }, [articles, feedsCount, isSyncing, syncFeeds]);
   const filteredArticles = useMemo(() => {
     if (!articles) return [];
     if (!searchQuery) return articles;
@@ -69,7 +71,12 @@ export function HomePage() {
                   </div>
                 )}
               </div>
-              {isSyncing && <Progress value={45} className="h-1 max-w-xs bg-primary/10" />}
+              {isSyncing && (
+                <div className="space-y-2 max-w-xs">
+                  <Progress value={45} className="h-1 bg-primary/10" />
+                  <p className="text-[10px] uppercase font-black tracking-widest text-primary/60">Mesh Reconciliation in Progress</p>
+                </div>
+              )}
             </div>
           </div>
           <div className="absolute right-[-5%] bottom-[-10%] opacity-5 pointer-events-none select-none">

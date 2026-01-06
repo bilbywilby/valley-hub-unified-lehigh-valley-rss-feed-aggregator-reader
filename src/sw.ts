@@ -10,17 +10,24 @@ declare const self: ServiceWorkerGlobalScope;
 self.addEventListener('install', (event: ExtendableEvent) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+      console.log('[SW] Caching application shell');
+      return cache.addAll(ASSETS_TO_CACHE).catch(err => {
+        console.error('[SW] Cache installation failed:', err);
+      });
     })
   );
 });
 self.addEventListener('activate', (event: ExtendableEvent) => {
+  console.log('[SW] Activating regional node context');
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
-      );
-    })
+    Promise.all([
+      caches.keys().then((keys) => {
+        return Promise.all(
+          keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        );
+      }),
+      syncOutbox()
+    ])
   );
 });
 self.addEventListener('fetch', (event: FetchEvent) => {
@@ -30,6 +37,7 @@ self.addEventListener('fetch', (event: FetchEvent) => {
     );
     return;
   }
+  // Bypass cache for API calls to ensure fresh mesh state
   if (event.request.url.includes('/api/')) {
     event.respondWith(fetch(event.request));
     return;
@@ -42,11 +50,11 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 });
 self.addEventListener('message', (event: ExtendableMessageEvent) => {
   if (event.data && event.data.type === 'PRUNE_DATA') {
-    console.log('[SW] Starting maintenance prune...');
+    console.log('[SW] Starting regional data maintenance...');
     event.waitUntil(
       db.pruneOldData()
-        .then(() => console.log('[SW] Maintenance complete.'))
-        .catch((err) => console.error('[SW] Prune failed:', err))
+        .then(() => console.log('[SW] Maintenance complete: local storage optimized'))
+        .catch((err) => console.error('[SW] Maintenance failed:', err))
     );
   }
 });
@@ -54,6 +62,7 @@ async function syncOutbox() {
   try {
     const unsynced = await db.telemetry.where('synced').equals(0).toArray();
     if (unsynced.length === 0) return;
+    console.log(`[SW] Synchronizing ${unsynced.length} pending telemetry events`);
     const response = await fetch('/api/telemetry', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -65,8 +74,9 @@ async function syncOutbox() {
         key: id,
         changes: { synced: 1 }
       })));
+      console.log('[SW] Telemetry synchronized with mesh node');
     }
   } catch (error) {
-    console.error('[SW] Sync failed:', error);
+    console.warn('[SW] Outbox sync postponed: connection unavailable');
   }
 }
