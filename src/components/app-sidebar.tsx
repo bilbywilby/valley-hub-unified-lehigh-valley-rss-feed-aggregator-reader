@@ -1,5 +1,5 @@
 import React from "react";
-import { Home, Rss, Settings, BarChart3, Info, RefreshCw, PlusCircle, Trash2 } from "lucide-react";
+import { Home, Rss, Settings, BarChart3, Info, RefreshCw, PlusCircle, Trash2, BookOpen } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -22,6 +22,7 @@ export function AppSidebar(): JSX.Element {
     { label: "Home", path: "/", icon: Home },
     { label: "Feeds", path: "/feeds", icon: Rss },
     { label: "Metrics", path: "/telemetry", icon: BarChart3 },
+    { label: "Wiki", path: "/docs", icon: BookOpen },
     { label: "Settings", path: "/settings", icon: Settings },
   ];
   return (

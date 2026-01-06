@@ -14,6 +14,7 @@ import '@/index.css'
 import { HomePage } from '@/pages/HomePage'
 import { FeedManagementPage } from '@/pages/FeedManagementPage'
 import { ArticleDetailPage } from '@/pages/ArticleDetailPage'
+import { DocsPage } from '@/pages/DocsPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { TelemetryPage } from '@/pages/TelemetryPage'
 const queryClient = new QueryClient();
@@ -57,6 +58,16 @@ const router = createBrowserRouter([
   {
     path: "/settings",
     element: <SettingsPage />,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/docs",
+    element: <DocsPage />,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/docs/:slug",
+    element: <DocsPage />,
     errorElement: <RouteErrorBoundary />,
   },
 ]);

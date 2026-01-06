@@ -18,14 +18,14 @@ export const DOCS_MAP: Record<string, DocMetadata> = {
     title: 'Mesh System Design',
     description: 'Technical overview of the backend architecture.',
     category: 'Technical',
-    content: `# Regional Mesh System Design\n\nValley Hub utilizes a hybrid architecture combining client-side persistence with a Cloudflare Workers-based signaling and proxy layer.\n\n### Components\n- **Network Sentinel**: Privacy-shielding proxy with 5-minute cache headers.\n- **Durable Object**: Global consensus and IQS engine managing ephmeral node discovery.\n- **Rate Limiting**: Token-bucket protection on v1 API endpoints.`
+    content: `# Regional Mesh System Design\n\nValley Hub utilizes a hybrid architecture combining client-side persistence with a Cloudflare Workers-based signaling and proxy layer.\n\n### Components\n- **Network Sentinel**: Privacy-shielding proxy.\n- **Durable Object**: Global consensus and IQS engine.\n- **Rate Limiting**: Protects the mesh from abuse.`
   },
   'privacy-protocols': {
     slug: 'privacy-protocols',
     title: 'Privacy & Identity',
     description: 'Identity and location anonymization systems.',
     category: 'Privacy',
-    content: `# Privacy & Identity Protocols\n\nValley Hub uses cryptographic identity and mathematical noise.\n\n- **ECDSA P-256**: Non-extractable identity.\n- **Geo-Jitter**: Poisson-disc anonymization for location privacy.\n- **SHA-256 Commitment**: Content deduplication without text logging.\n- **Ephemerality**: Discovery signals expire after 24h.`
+    content: `# Privacy & Identity Protocols\n\nValley Hub uses cryptographic identity and mathematical noise.\n\n- **ECDSA P-256**: Non-extractable identity.\n- **Geo-Jitter**: Poisson-disc anonymization for location privacy.`
   },
   'data-persistence': {
     slug: 'data-persistence',
@@ -47,13 +47,6 @@ export const DOCS_MAP: Record<string, DocMetadata> = {
     description: 'Future development plans.',
     category: 'Strategic',
     content: `# Implementation Roadmap\n\n- **Current**: Documentation & Mesh Resilience.\n- **Future**: P2P Mesh, Advanced RAG, and Sentiment Analysis.`
-  },
-  'release-notes': {
-    slug: 'release-notes',
-    title: 'System Release v1.0.0',
-    description: 'Architecture, Features, and Deployment manifest.',
-    category: 'Technical',
-    content: `# Valley Hub v1.0.0 Manifest\n\nValley Hub is a modern RSS aggregator for the Lehigh Valley, built with a "Privacy-by-Default" architecture.\n\n### 🚀 Features\n- **Mesh Aggregator**: Unified feed from 140+ regional sources.\n- **Secure Identity**: ECDSA P-256 keys generated on-device; never leaves the browser.\n- **IQS Engine**: Algorithmic scoring of feed quality and density.\n- **Sentinel Proxy**: Privacy-preserving CORS bypass for RSS fetching.\n\n### 🏗️ Architecture\n- **Frontend**: React 18, Tailwind CSS v3, Framer Motion, and Dexie.js (IndexedDB).\n- **Backend**: Cloudflare Workers + Hono.\n- **State**: Global Durable Object for mesh signaling and consensus.\n\n### 📦 Deployment\nValley Hub is optimized for the **Bun + Wrangler** stack.\n\n\`\`\`bash\n# 1. Install dependencies\nbun install\n\n# 2. Local development\nbun run dev\n\n# 3. Production build\nbun run build\n\n# 4. Deploy to Cloudflare\nbun run deploy\n\`\`\`\n\n### 🛡️ Privacy Commitments\n- No centralized user tracking.\n- Local-first article storage.\n- Jittered telemetry coordinates.`
   }
 };
 export const DOCS_LIST = Object.values(DOCS_MAP);
