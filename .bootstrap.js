@@ -86,7 +86,8 @@ function runSetupCommands() {
     "bun add react-icons@^5.3.0",
     "bun add swiper@^11.1.14",
     "bun add react-markdown@^9.0.1",
-    "bun install dexie-react-hooks dexie"
+    "bun install dexie-react-hooks dexie",
+    "bun add react-markdown"
 ];
     
     if (commands.length === 0) {
