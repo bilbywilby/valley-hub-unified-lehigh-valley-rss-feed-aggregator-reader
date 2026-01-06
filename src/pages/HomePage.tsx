@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Newspaper, Bookmark, Share2, Clock, Globe, RefreshCcw, Rss, Search } from 'lucide-react';
+import { Newspaper, Bookmark, Share2, Clock, Globe, RefreshCcw, Rss, Search, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import type { Article } from '@shared/types';
 import { formatDistanceToNow } from 'date-fns';
 export function HomePage() {
@@ -21,6 +22,12 @@ export function HomePage() {
   useEffect(() => {
     getOrCreateIdentity();
   }, []);
+  // Auto-sync on first run if articles are empty but feeds exist
+  useEffect(() => {
+    if (articles && articles.length === 0 && feedsCount > 0 && !isSyncing) {
+      syncFeeds();
+    }
+  }, [articles?.length, feedsCount]);
   const filteredArticles = useMemo(() => {
     if (!articles) return [];
     if (!searchQuery) return articles;
@@ -33,60 +40,68 @@ export function HomePage() {
   return (
     <AppLayout container={true}>
       <div className="space-y-12">
-        {/* Hero Section */}
-        <section className="relative rounded-4xl overflow-hidden bg-gradient-mesh p-8 md:p-12 lg:p-20 shadow-soft">
+        {/* Hero Section - MD3 Surface Level 2 */}
+        <section className="relative rounded-4xl overflow-hidden bg-surface-container-high p-8 md:p-12 lg:p-16 shadow-md3-2 border border-border/50">
           <div className="relative z-10 max-w-3xl space-y-6">
-            <Badge className="bg-white/20 text-white backdrop-blur-md border-none px-4 py-1">
-              What's New in Lehigh Valley
+            <Badge className="bg-primary/10 text-primary border-none px-4 py-1.5 rounded-full font-bold tracking-tight">
+              <Sparkles className="h-3 w-3 mr-2 inline" /> Lehigh Valley Intelligence
             </Badge>
-            <h1 className="text-5xl md:text-6xl font-display font-extrabold text-white leading-tight">
-              Local News, <span className="text-black/10 font-bold">Redefined</span>
+            <h1 className="text-5xl md:text-6xl font-display font-extrabold text-foreground leading-tight tracking-tight">
+              Local News, <span className="text-primary italic">Refined</span>
             </h1>
-            <p className="text-lg text-white/90 font-medium max-w-xl text-pretty">
-              Aggregated, curated, and privacy-focused news from across the region.
+            <p className="text-lg text-muted-foreground font-medium max-w-xl text-pretty leading-relaxed">
+              Privacy-first aggregation of the region's most relevant stories.
             </p>
-            <div className="flex flex-wrap gap-4 pt-2">
-              <Button
-                onClick={() => syncFeeds()}
-                disabled={isSyncing}
-                size="lg"
-                className="bg-white text-brand-orange hover:bg-brand-orange hover:text-white border-none shadow-lg transition-all"
-              >
-                {isSyncing ? <RefreshCcw className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
-                Refresh Feed
-              </Button>
+            <div className="flex flex-col gap-4 pt-2">
+              <div className="flex flex-wrap gap-4">
+                <Button
+                  onClick={() => syncFeeds()}
+                  disabled={isSyncing}
+                  size="lg"
+                  className="rounded-full bg-primary text-primary-foreground hover:shadow-glow px-8 h-12 transition-all"
+                >
+                  {isSyncing ? <RefreshCcw className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
+                  {isSyncing ? "Syncing Mesh..." : "Update Feed"}
+                </Button>
+                {isSyncing && (
+                  <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-primary/5 border border-primary/10">
+                    <span className="text-xs font-bold text-primary animate-pulse">Processing Sources</span>
+                  </div>
+                )}
+              </div>
+              {isSyncing && <Progress value={45} className="h-1 max-w-xs bg-primary/10" />}
             </div>
           </div>
-          <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none">
-            <Newspaper className="w-80 h-80 -mr-12 -mb-12 rotate-12" />
+          <div className="absolute right-[-5%] bottom-[-10%] opacity-5 pointer-events-none select-none">
+            <Rss className="w-96 h-96 text-primary rotate-12" />
           </div>
         </section>
-        {/* Search & Actions */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Search - MD3 Mapped Input */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search local stories..."
-              className="pl-10 bg-card border-none shadow-soft h-11"
+              placeholder="Search local intelligence..."
+              className="pl-12 bg-surface-container-low border-none shadow-md3-1 h-14 rounded-full text-base"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="bg-card shadow-soft border-none h-11 px-6 font-medium">Latest</Button>
-            <Button variant="ghost" size="sm" className="h-11 px-6 font-medium">Trending</Button>
+          <div className="flex gap-3">
+            <Button variant="outline" className="rounded-full border-none bg-surface-container h-12 px-6 font-bold shadow-md3-1 hover:shadow-md3-2">Latest</Button>
+            <Button variant="ghost" className="rounded-full h-12 px-6 font-bold text-muted-foreground hover:text-primary">Regional</Button>
           </div>
         </div>
         {/* Article Grid */}
         {!articles || filteredArticles.length === 0 ? (
-          <div className="py-24 text-center space-y-6 bg-muted/20 rounded-4xl border border-dashed border-muted">
-            <div className="w-20 h-20 bg-accent rounded-full flex items-center justify-center mx-auto shadow-sm">
-              <Rss className="h-10 w-10 text-muted-foreground" />
+          <div className="py-32 text-center space-y-6 bg-surface-container-low rounded-4xl border-2 border-dashed border-border/50 animate-fade-in">
+            <div className="w-24 h-24 bg-surface-container-high rounded-full flex items-center justify-center mx-auto shadow-md3-1">
+              <Newspaper className="h-10 w-10 text-primary/40" />
             </div>
-            <div className="space-y-2">
-              <h3 className="text-xl font-bold">No articles found</h3>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                {feedsCount === 0 ? "Add some feeds in Feed Management to get started." : "Try adjusting your search or hit refresh for latest updates."}
+            <div className="space-y-3">
+              <h3 className="text-2xl font-bold">Waiting for Ingestion</h3>
+              <p className="text-muted-foreground max-w-sm mx-auto leading-relaxed">
+                {feedsCount === 0 ? "Initial setup required. Head to Manage Feeds." : "Our mesh is currently updating. This usually takes a few seconds."}
               </p>
             </div>
           </div>
@@ -114,63 +129,63 @@ function ArticleCard({ article, index }: { article: Article; index: number }) {
   }, [article.pubDate]);
   return (
     <motion.div
-      initial={{ opacity: 0, y: 15 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0, scale: 0.95 }}
+      whileInView={{ opacity: 1, scale: 1 }}
       viewport={{ once: true }}
-      transition={{ delay: Math.min(index * 0.05, 0.4), duration: 0.5 }}
+      transition={{ delay: Math.min(index * 0.03, 0.3), duration: 0.4 }}
     >
       <Link to={`/article/${article.id}`}>
-        <Card className="h-full flex flex-col group hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-none bg-card shadow-soft overflow-hidden">
-          <div className="aspect-[16/10] relative overflow-hidden bg-muted">
+        <Card className="md3-card h-full flex flex-col group border-none">
+          <div className="aspect-[16/10] relative overflow-hidden m-2 rounded-2xl bg-surface-container-high">
             {article.imageUrl ? (
               <img
                 src={article.imageUrl}
                 alt={article.title}
-                className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-700"
+                className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
               />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-brand-orange/5 to-brand-red-orange/15 flex items-center justify-center p-6 text-center">
-                 <Newspaper className="h-12 w-12 text-brand-orange/10 group-hover:scale-110 transition-transform duration-500" />
+              <div className="w-full h-full bg-primary/5 flex items-center justify-center p-6 text-center">
+                 <Newspaper className="h-10 w-10 text-primary/20" />
               </div>
             )}
-            <Badge className="absolute top-3 left-3 bg-brand-orange/90 text-white backdrop-blur-sm border-none shadow-sm hover:bg-brand-orange">
-              {article.category || 'News'}
-            </Badge>
-          </div>
-          <CardHeader className="p-5 pb-2">
-            <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-2 uppercase font-bold tracking-widest overflow-hidden">
-              <Globe className="h-3 w-3 flex-shrink-0" />
-              <span className="truncate max-w-[120px]">{article.sourceName}</span>
-              <span className="flex-shrink-0">•</span>
-              <Clock className="h-3 w-3 flex-shrink-0" />
-              <span className="truncate">{timeAgo}</span>
+            <div className="absolute top-3 left-3 flex gap-2">
+              <Badge className="bg-primary text-primary-foreground border-none rounded-lg shadow-md">
+                {article.category || 'News'}
+              </Badge>
             </div>
-            <h3 className="text-lg font-bold leading-tight group-hover:text-brand-orange transition-colors line-clamp-2 min-h-[3rem]">
+          </div>
+          <CardHeader className="px-5 pb-2 pt-3">
+            <div className="flex items-center gap-2 text-[10px] text-primary font-black uppercase tracking-widest mb-2 opacity-70">
+              <span className="truncate">{article.sourceName}</span>
+              <span className="text-muted-foreground font-normal opacity-50">/</span>
+              <span className="truncate text-muted-foreground lowercase font-medium">{timeAgo}</span>
+            </div>
+            <h3 className="text-lg font-bold leading-snug group-hover:text-primary transition-colors line-clamp-2 min-h-[3rem]">
               {article.title}
             </h3>
           </CardHeader>
-          <CardContent className="p-5 pt-0 flex-grow">
-            <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
+          <CardContent className="px-5 pt-0 flex-grow">
+            <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed opacity-80">
               {article.description?.replace(/<[^>]*>?/gm, '')}
             </p>
           </CardContent>
-          <CardFooter className="p-5 pt-0 flex justify-between items-center border-t border-border/40 mt-auto">
+          <CardFooter className="px-5 py-4 pt-0 flex justify-between items-center mt-auto border-t border-border/20">
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 text-muted-foreground hover:text-brand-orange hover:bg-brand-orange/10 transition-colors"
+              className="h-10 w-10 rounded-full hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
               onClick={(e) => {
                 e.preventDefault();
                 db.articles.update(article.id, { isBookmarked: !article.isBookmarked });
               }}
             >
-              <Bookmark className={`h-5 w-5 ${article.isBookmarked ? "fill-current text-brand-orange" : ""}`} />
+              <Bookmark className={`h-5 w-5 ${article.isBookmarked ? "fill-current text-primary" : ""}`} />
             </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-9 w-9 text-muted-foreground hover:text-brand-orange hover:bg-brand-orange/10"
-              onClick={(e) => { e.preventDefault(); /* implement share */ }}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 rounded-full hover:bg-primary/10 text-muted-foreground hover:text-primary"
+              onClick={(e) => { e.preventDefault(); }}
             >
               <Share2 className="h-5 w-5" />
             </Button>

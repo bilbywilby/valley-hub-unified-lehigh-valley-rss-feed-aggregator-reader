@@ -1,3 +1,4 @@
+/// <reference lib="webworker" />
 import { db } from './lib/db';
 const CACHE_NAME = 'valley-hub-v1';
 const ASSETS_TO_CACHE = [
@@ -5,7 +6,6 @@ const ASSETS_TO_CACHE = [
   '/index.html',
   '/manifest.webmanifest'
 ];
-// Service Worker Type Assertion
 declare const self: ServiceWorkerGlobalScope;
 self.addEventListener('install', (event: ExtendableEvent) => {
   event.waitUntil(
@@ -24,14 +24,12 @@ self.addEventListener('activate', (event: ExtendableEvent) => {
   );
 });
 self.addEventListener('fetch', (event: FetchEvent) => {
-  // Navigation fallback to index.html for SPA support
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => caches.match('/') as Promise<Response>)
     );
     return;
   }
-  // Cache-first for static assets, network-first for API
   if (event.request.url.includes('/api/')) {
     event.respondWith(fetch(event.request));
     return;
@@ -42,12 +40,7 @@ self.addEventListener('fetch', (event: FetchEvent) => {
     })
   );
 });
-self.addEventListener('sync', (event: any) => {
-  if (event.tag === 'outbox-sync') {
-    event.waitUntil(syncOutbox());
-  }
-});
-self.addEventListener('message', (event: MessageEvent) => {
+self.addEventListener('message', (event: ExtendableMessageEvent) => {
   if (event.data && event.data.type === 'PRUNE_DATA') {
     console.log('[SW] Starting maintenance prune...');
     event.waitUntil(
@@ -72,7 +65,6 @@ async function syncOutbox() {
         key: id,
         changes: { synced: 1 }
       })));
-      console.log(`[SW] Successfully synced ${ids.length} telemetry events.`);
     }
   } catch (error) {
     console.error('[SW] Sync failed:', error);
