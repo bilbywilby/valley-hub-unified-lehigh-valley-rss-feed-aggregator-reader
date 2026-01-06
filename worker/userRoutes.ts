@@ -64,19 +64,13 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
             });
             if(!res.ok) throw new Error(`Source Error: ${res.status}`);
             const responseHeaders = new Headers();
-            // 10-minute cache strategy (600 seconds)
-            responseHeaders.set('Cache-Control', 'public, s-maxage=600, max-age=600'); 
+            responseHeaders.set('Cache-Control', 'public, s-maxage=600, max-age=600');
             responseHeaders.set('Access-Control-Allow-Origin', '*');
             responseHeaders.set('Content-Type', res.headers.get('Content-Type') || 'application/xml');
             return new Response(res.body, { status: res.status, headers: responseHeaders });
         } catch(err: any) {
             return c.json({ success: false, error: err.message }, 502);
         }
-    });
-    // Support Legacy Path for compatibility
-    app.get('/api/proxy', (c) => {
-        const url = c.req.query('url');
-        return c.redirect(`/api/v1/sentinel/proxy?url=${encodeURIComponent(url || '')}`);
     });
     // IQS & Signaling
     app.post('/api/v1/iqs/:feedUrl', async (c) => {
@@ -98,11 +92,19 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         return c.json({ success: true });
     });
     app.post('/api/signal/vote', async (c) => {
-        const { feedUrl, score } = await c.req.json();
-        const nodeId = c.req.header('x-node-id');
-        if (!nodeId) return c.json({ success: false, error: 'Node ID required' }, 401);
-        await getStub(c).voteQuality(feedUrl, score);
-        return c.json({ success: true });
+        try {
+            const { feedUrl, score } = await c.req.json();
+            const nodeId = c.req.header('x-node-id');
+            if (!nodeId) return c.json({ success: false, error: 'Node ID required' }, 401);
+            if (!feedUrl) return c.json({ success: false, error: 'Feed URL required' }, 400);
+            const numericScore = Number(score);
+            if (isNaN(numericScore)) return c.json({ success: false, error: 'Invalid score' }, 400);
+            await getStub(c).voteQuality(feedUrl, numericScore);
+            return c.json({ success: true });
+        } catch (err: any) {
+            console.error(`[SIGNAL_VOTE_ERROR] ${err.message}`);
+            return c.json({ success: false, error: 'Internal Signal Failure' }, 500);
+        }
     });
     app.get('/api/signal/stats/:feedUrl', async (c) => {
         const feedUrl = decodeURIComponent(c.req.param('feedUrl'));
@@ -111,7 +113,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     });
     app.post('/api/telemetry', async (c) => {
         const body = await c.req.json();
-        await getStub(c).recordTelemetryBatch(body.events);
+        await getStub(c).recordTelemetryBatch(body.events || []);
         return c.json({ success: true });
     });
     app.get('/api/network/status', async (c) => {

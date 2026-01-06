@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 type AppLayoutProps = {
-  children: React.InnerComponent | React.ReactNode;
+  children: React.ReactNode;
   container?: boolean;
   className?: string;
 };
@@ -41,7 +41,6 @@ export function AppLayout({ children, container = false, className }: AppLayoutP
   return (
     <div className="flex min-h-screen bg-terminal-bg relative">
       <div className="fixed inset-0 pointer-events-none terminal-bg-scanline opacity-[0.03] z-[100]" />
-      {/* Sticky Header */}
       <header className={cn(
         "fixed top-0 right-0 left-20 z-[55] transition-all duration-500 border-b",
         scrolled
@@ -81,7 +80,6 @@ export function AppLayout({ children, container = false, className }: AppLayoutP
           </div>
         </div>
       </header>
-      {/* M3 Navigation Rail */}
       <nav className="fixed left-0 top-0 h-full w-20 flex flex-col items-center py-8 bg-surface-container border-r border-border/10 z-[60]">
         <div className="mb-10">
           <Link to="/">
@@ -129,7 +127,6 @@ export function AppLayout({ children, container = false, className }: AppLayoutP
           </div>
         </div>
       </nav>
-      {/* Main Content Area */}
       <main className={cn(
         "flex-1 ml-20 mt-16 transition-all duration-300 min-h-screen",
         container ? "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10 lg:py-12" : "",

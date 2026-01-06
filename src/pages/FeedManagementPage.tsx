@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Plus, Trash2, Rss, Globe, AlertCircle, Sparkles, Loader2, ThumbsUp, ThumbsDown, ShieldCheck } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { MASTER_FEEDS } from '@shared/master-feeds';
@@ -121,6 +120,7 @@ export function FeedManagementPage() {
 }
 function FeedCard({ feed, onRemove }: { feed: any, onRemove: () => void }) {
   const [globalStats, setGlobalStats] = useState<any>(null);
+  const [isVoting, setIsVoting] = useState(false);
   const identity = useLiveQuery(() => db.identity.toCollection().first());
   const sigId = useMemo(() => {
     let hash = 0;
@@ -130,22 +130,47 @@ function FeedCard({ feed, onRemove }: { feed: any, onRemove: () => void }) {
     }
     return Math.abs(hash).toString(16).substring(0, 8).toUpperCase();
   }, [feed.xmlUrl]);
+  const fetchStats = async () => {
+    try {
+      const res = await fetch(`/api/signal/stats/${encodeURIComponent(feed.xmlUrl)}`);
+      const json = await res.json();
+      if (json.success) setGlobalStats(json.data);
+    } catch (err) {
+      console.warn(`[MESH] Signal lookup failed for ${feed.title}`);
+    }
+  };
   useEffect(() => {
-    let isMounted = true;
-    const fetchStats = async () => {
-      try {
-        const res = await fetch(`/api/signal/stats/${encodeURIComponent(feed.xmlUrl)}`);
-        const json = await res.json();
-        if (isMounted && json.success) setGlobalStats(json.data);
-      } catch (err) {
-        console.warn(`[MESH] Signal lookup failed for ${feed.title}`);
-      }
-    };
     fetchStats();
-    return () => { isMounted = false; };
-  }, [feed.xmlUrl, feed.title]);
+  }, [feed.xmlUrl]);
+  const handleVote = async (score: number) => {
+    if (!identity) {
+      toast.error("Node identity required for mesh voting");
+      return;
+    }
+    setIsVoting(true);
+    try {
+      const response = await fetch('/api/signal/vote', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-node-id': identity.nodeId
+        },
+        body: JSON.stringify({ feedUrl: feed.xmlUrl, score })
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success(`Signal broadcasted: ${score === 100 ? 'TRUST' : 'MISTRUST'}`);
+        await fetchStats();
+      } else {
+        toast.error(data.error || "Signal broadcast failed");
+      }
+    } catch (err) {
+      toast.error("Mesh network unreachable");
+    } finally {
+      setIsVoting(false);
+    }
+  };
   const score = globalStats?.consensusScore ?? feed.quality;
-  const delta = Math.abs(score - feed.quality);
   return (
     <Card className="shadow-md3-1 border-none group relative overflow-hidden bg-surface-container-low rounded-3xl transition-all hover:bg-surface-container-high hover:shadow-md3-2">
       <div className="absolute top-4 right-4 font-mono text-[9px] font-black text-primary opacity-40 group-hover:opacity-100 transition-opacity">
@@ -167,12 +192,12 @@ function FeedCard({ feed, onRemove }: { feed: any, onRemove: () => void }) {
             <span className="text-primary">{score}%</span>
           </div>
           <div className="relative h-2 w-full bg-black/20 rounded-full overflow-hidden">
-             <div 
-               className="absolute top-0 left-0 h-full bg-primary/40 transition-all duration-1000" 
+             <div
+               className="absolute top-0 left-0 h-full bg-primary/40 transition-all duration-1000"
                style={{ width: `${feed.quality}%` }}
              />
-             <div 
-               className="absolute top-0 left-0 h-full bg-primary shadow-[0_0_10px_hsl(var(--primary))] transition-all duration-1000" 
+             <div
+               className="absolute top-0 left-0 h-full bg-primary shadow-[0_0_10px_hsl(var(--primary))] transition-all duration-1000"
                style={{ width: `${score}%` }}
              />
           </div>
@@ -189,10 +214,22 @@ function FeedCard({ feed, onRemove }: { feed: any, onRemove: () => void }) {
             )}
           </div>
           <div className="flex gap-2">
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              disabled={isVoting}
+              onClick={() => handleVote(100)}
+              className="h-8 w-8 rounded-full hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors"
+            >
               <ThumbsUp className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              disabled={isVoting}
+              onClick={() => handleVote(0)}
+              className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
+            >
               <ThumbsDown className="h-4 w-4" />
             </Button>
           </div>
