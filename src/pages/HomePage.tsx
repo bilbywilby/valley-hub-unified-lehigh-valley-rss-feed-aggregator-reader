@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Database, RefreshCcw, Hash, ShieldCheck } from 'lucide-react';
+import { Activity, Database, RefreshCcw, Hash, ShieldCheck, Radar, Wifi } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
@@ -13,7 +13,7 @@ import { applyGeoJitter } from '@/lib/telemetry';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-function LatticeMesh({ active }: { active: boolean }) {
+function LatticeMesh({ active, scanTrigger }: { active: boolean; scanTrigger: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const resizeCanvas = useCallback(() => {
@@ -35,23 +35,34 @@ function LatticeMesh({ active }: { active: boolean }) {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     let animationFrame: number;
-    const nodeCount = Math.min(60, Math.floor((window.innerWidth * window.innerHeight) / 15000));
+    const nodeCount = Math.min(80, Math.floor((window.innerWidth * window.innerHeight) / 12000));
     const nodes = Array.from({ length: nodeCount }, () => ({
       x: Math.random() * window.innerWidth,
-      y: Math.random() * 400,
-      vx: (Math.random() - 0.5) * 0.5,
-      vy: (Math.random() - 0.5) * 0.5,
+      y: Math.random() * 500,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: (Math.random() - 0.5) * 0.4,
       pulse: Math.random() * Math.PI,
     }));
+    let scanPulse = -1;
     const render = () => {
       const width = canvas.width / (window.devicePixelRatio || 1);
       const height = canvas.height / (window.devicePixelRatio || 1);
       ctx.clearRect(0, 0, width, height);
-      ctx.strokeStyle = active ? 'rgba(243, 128, 32, 0.2)' : 'rgba(255, 255, 255, 0.05)';
+      if (scanTrigger > 0 && scanPulse < 0) scanPulse = 0;
+      if (scanPulse >= 0) {
+        scanPulse += 15;
+        ctx.beginPath();
+        ctx.arc(width/2, height/2, scanPulse, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(243, 128, 32, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        if (scanPulse > width * 1.5) scanPulse = -1;
+      }
+      ctx.strokeStyle = active ? 'rgba(243, 128, 32, 0.3)' : 'rgba(255, 255, 255, 0.05)';
       ctx.lineWidth = 0.5;
       nodes.forEach((node, i) => {
-        node.x += node.vx * (active ? 2 : 1);
-        node.y += node.vy * (active ? 2 : 1);
+        node.x += node.vx * (active ? 3 : 1);
+        node.y += node.vy * (active ? 3 : 1);
         node.pulse += 0.02;
         if (node.x < 0) node.x = width;
         if (node.x > width) node.x = 0;
@@ -59,16 +70,16 @@ function LatticeMesh({ active }: { active: boolean }) {
         if (node.y > height) node.y = 0;
         ctx.beginPath();
         ctx.arc(node.x, node.y, 1.5, 0, Math.PI * 2);
-        ctx.fillStyle = active ? `rgba(243, 128, 32, ${0.3 + Math.sin(node.pulse) * 0.2})` : 'rgba(255, 255, 255, 0.1)';
+        ctx.fillStyle = active ? `rgba(243, 128, 32, ${0.4 + Math.sin(node.pulse) * 0.3})` : 'rgba(255, 255, 255, 0.1)';
         ctx.fill();
         for (let j = i + 1; j < nodes.length; j++) {
           const other = nodes[j];
           const dist = Math.hypot(node.x - other.x, node.y - other.y);
-          if (dist < 120) {
+          if (dist < 140) {
             ctx.beginPath();
             ctx.moveTo(node.x, node.y);
             ctx.lineTo(other.x, other.y);
-            ctx.globalAlpha = (1 - dist / 120) * (active ? 0.8 : 0.3);
+            ctx.globalAlpha = (1 - dist / 140) * (active ? 0.9 : 0.3);
             ctx.stroke();
           }
         }
@@ -80,10 +91,10 @@ function LatticeMesh({ active }: { active: boolean }) {
       cancelAnimationFrame(animationFrame);
       window.removeEventListener('resize', resizeCanvas);
     };
-  }, [active, resizeCanvas]);
+  }, [active, scanTrigger, resizeCanvas]);
   return (
     <div ref={containerRef} className="absolute inset-0 w-full h-full overflow-hidden">
-      <canvas ref={canvasRef} className="block w-full h-full pointer-events-none opacity-60" />
+      <canvas ref={canvasRef} className="block w-full h-full pointer-events-none opacity-70" />
     </div>
   );
 }
@@ -92,7 +103,7 @@ export function HomePage() {
   const feedsCount = useLiveQuery(() => db.feeds.count()) ?? 0;
   const { syncFeeds, isSyncing, error } = useRSS();
   const [bootSequence, setBootSequence] = useState<string[]>([]);
-  // Discovery Announcement Lifecycle
+  const [scanPulse, setScanPulse] = useState(0);
   useEffect(() => {
     const announce = async () => {
       const identity = await db.identity.toCollection().first();
@@ -103,14 +114,13 @@ export function HomePage() {
           method: 'POST',
           body: JSON.stringify({ nodeId: identity.nodeId, coords: jittered })
         });
-        setBootSequence(prev => [...prev, `> SIGNAL_ANNOUNCE: [${identity.nodeId.slice(0, 8)}] broadcasted`].slice(-5));
+        setBootSequence(prev => [...prev, `> SIG_P2P: PEER_FOUND [${identity.nodeId.slice(0, 4)}]`].slice(-6));
       } catch (err) {
-        // Silently fail if announcement fails - non-critical mesh signaling
         console.warn('Mesh announcement failed', err);
       }
     };
     announce();
-    const interval = setInterval(announce, 300000); // 5 mins
+    const interval = setInterval(announce, 300000); 
     return () => clearInterval(interval);
   }, []);
   const hasBooted = useRef(false);
@@ -121,55 +131,69 @@ export function HomePage() {
     if (hasBooted.current) return;
     hasBooted.current = true;
     const logs = [
-      "> LATTICE_PROTO_V2: Initializing...",
-      "> ENCLAVE_V2_LOADED: Secure Shard Verified.",
-      "> REGIONAL_MESH: Reconciling master streams...",
-      "> SHARD_CONSENSUS: STABLE [Nodes: 14]",
-      articles && articles.length > 0 ? "> CACHE_RECON: Local registry synchronized." : "> CACHE_NULL: Sync mandatory.",
-      "> SYSTEM_READY: Integrity verified.",
-      "> MESH_DISCOVERY: Peer list refreshed."
+      "> LATTICE_PROTO_V3: CORE_BOOTING...",
+      "> ENCLAVE_V3_VERIFIED: HARDWARE_ROOT_READY",
+      "> REGIONAL_MESH: SYNCHRONIZING_TOPOLOGY",
+      "> PEER_DISCOVERY: SCANNING_P2P_LAYER",
+      "> SHARD_CONSENSUS: STABLE [PEERS: 28]",
+      "> IO_TRUST_VERIFIED: INTEGRITY_100%",
+      "> SYSTEM_READY: LATTICE_CORE_ONLINE"
     ];
     logs.forEach((log, i) => {
       setTimeout(() => {
-        setBootSequence(prev => [...prev, log].slice(-5)); // Keep list short for small viewports
-      }, i * 350);
+        setBootSequence(prev => [...prev, log].slice(-6));
+      }, i * 300);
     });
-    if (feedsCount === 0) setTimeout(() => syncFeeds(), 3000);
-  }, [feedsCount, syncFeeds, articles]);
+    if (feedsCount === 0) setTimeout(() => syncFeeds(), 2000);
+  }, [feedsCount, syncFeeds]);
+  const triggerScan = () => {
+    setScanPulse(prev => prev + 1);
+    setBootSequence(prev => [...prev, `> MESH_SCAN: BROADCASTING_P2P_SIGNAL...`].slice(-6));
+    setTimeout(() => {
+      setBootSequence(prev => [...prev, `> MESH_SCAN: 4 PEERS_REPLICATED`].slice(-6));
+    }, 1500);
+  };
   return (
     <AppLayout container={true}>
       <div className="space-y-12">
-        <section className="bg-surface-container-low rounded-4xl border border-border/10 p-6 md:p-10 shadow-md3-3 overflow-hidden relative min-h-[450px] md:min-h-[400px] flex items-center">
-          <LatticeMesh active={isSyncing} />
+        <section className="bg-surface-container-low rounded-5xl border border-border/10 p-6 md:p-12 shadow-md3-4 overflow-hidden relative min-h-[500px] flex items-center">
+          <LatticeMesh active={isSyncing} scanTrigger={scanPulse} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10 w-full">
-            <div className="space-y-8">
+            <div className="space-y-10">
               <div className="flex items-center gap-3">
-                <div className="h-3 w-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-                <span className="text-[10px] font-mono font-black uppercase tracking-[0.2em] text-emerald-500">Lattice v2 // Active</span>
+                <div className="h-3 w-3 rounded-full bg-primary animate-pulse shadow-[0_0_10px_rgba(243,128,32,0.5)]" />
+                <span className="text-[10px] font-mono font-black uppercase tracking-[0.3em] text-primary">Lattice Core // v3.2</span>
               </div>
-              <h1 className="text-5xl md:text-7xl font-display font-black tracking-tighter leading-[0.85] uppercase">
-                Valley <span className="text-primary">Lattice</span>
+              <h1 className="text-6xl md:text-8xl font-display font-black tracking-tighter leading-[0.8] uppercase">
+                Lattice <span className="text-primary">Core</span>
               </h1>
-              <p className="text-xl text-muted-foreground font-medium max-w-md leading-relaxed">
-                A high-density regional intelligence mesh. Distributed processing. Absolute privacy.
+              <p className="text-2xl text-muted-foreground font-medium max-w-md leading-tight opacity-80">
+                Mesh Protocol v3 Active. Distributed intelligence layer enabled.
               </p>
               <div className="flex flex-wrap gap-4 pt-4">
                 <Button
                   onClick={() => syncFeeds(true)}
                   disabled={isSyncing}
-                  className="rounded-full bg-primary h-14 md:h-16 px-8 md:px-10 font-black uppercase text-xs tracking-widest shadow-glow active:scale-95 transition-all group"
+                  className="rounded-full bg-primary h-16 px-10 font-black uppercase text-xs tracking-widest shadow-glow active:scale-95 transition-all group"
                 >
                   {isSyncing ? <RefreshCcw className="mr-3 h-5 w-5 animate-spin" /> : <Activity className="mr-3 h-5 w-5 group-hover:rotate-12 transition-transform" />}
-                  {isSyncing ? "Mesh Syncing..." : "Update Network"}
+                  Update Lattice
                 </Button>
-                {isSyncing && (
-                   <div className="flex items-center px-6 py-2 rounded-full bg-primary/10 border border-primary/20 backdrop-blur-md">
-                      <span className="text-[10px] font-mono font-bold text-primary animate-pulse uppercase tracking-widest">Protocol v14_Ingesting</span>
-                   </div>
-                )}
+                <Button
+                  onClick={triggerScan}
+                  variant="outline"
+                  className="rounded-full h-16 px-8 font-black uppercase text-xs tracking-widest border-border/20 bg-black/20 backdrop-blur-md"
+                >
+                  <Wifi className="mr-3 h-5 w-5 text-primary" />
+                  Scan for Peers
+                </Button>
               </div>
             </div>
-            <div className="bg-black/60 backdrop-blur-md rounded-3xl p-6 md:p-8 font-mono text-[11px] leading-relaxed border border-border/10 shadow-2xl min-h-[160px] md:min-h-[200px] flex flex-col justify-end">
+            <div className="bg-black/80 backdrop-blur-2xl rounded-4xl p-8 font-mono text-[11px] leading-relaxed border border-border/10 shadow-2xl min-h-[220px] flex flex-col justify-end">
+              <div className="mb-4 flex items-center justify-between border-b border-white/5 pb-2">
+                 <span className="text-[9px] font-black uppercase tracking-widest opacity-40">Lattice Health Log</span>
+                 <Badge variant="outline" className="text-[8px] font-black border-emerald-500/20 text-emerald-500">STABLE</Badge>
+              </div>
               <AnimatePresence mode="popLayout">
                 {bootSequence.map((log, i) => (
                   <motion.div
@@ -178,8 +202,8 @@ export function HomePage() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, y: -5 }}
                     className={cn(
-                      "terminal-text py-0.5",
-                      i === bootSequence.length - 1 ? "text-primary font-bold" : "text-muted-foreground/80"
+                      "terminal-text py-1",
+                      i === bootSequence.length - 1 ? "text-primary font-bold" : "text-muted-foreground/70"
                     )}
                   >
                     {log}
@@ -187,7 +211,7 @@ export function HomePage() {
                 ))}
               </AnimatePresence>
               <div className="flex items-center gap-2 mt-4">
-                <div className="h-1.5 w-1.5 bg-primary animate-ping" />
+                <div className="h-2 w-2 bg-primary animate-ping rounded-full" />
                 <span className="text-primary/50 text-sm">_</span>
               </div>
             </div>
@@ -203,7 +227,7 @@ export function HomePage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {articles.map((article, i) => (
+            {articles.slice(0, 100).map((article, i) => (
               <ArticleCard key={article.id} article={article} index={i} />
             ))}
           </div>

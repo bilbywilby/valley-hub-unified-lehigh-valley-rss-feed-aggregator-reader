@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Rss, Settings, BarChart3, BookOpen, Fingerprint, ShieldAlert, Cpu, Search, Wifi } from "lucide-react";
+import { Home, Rss, Settings, BarChart3, BookOpen, Fingerprint, ShieldAlert, Cpu, Search, Wifi, Activity } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db";
@@ -15,16 +15,28 @@ export function AppLayout({ children, container = false, className }: AppLayoutP
   const location = useLocation();
   const identity = useLiveQuery(() => db.identity.toCollection().first());
   const [scrolled, setScrolled] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'stable' | 'syncing' | 'p2p'>('stable');
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+  // Simulate network indicator logic
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const rand = Math.random();
+      if (rand > 0.95) setSyncStatus('p2p');
+      else if (rand > 0.8) setSyncStatus('syncing');
+      else setSyncStatus('stable');
+      if (rand > 0.8) setTimeout(() => setSyncStatus('stable'), 2000);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
   const navItems = [
-    { label: "Mesh", path: "/", icon: Home },
-    { label: "Sources", path: "/feeds", icon: Rss },
-    { label: "Metrics", path: "/telemetry", icon: BarChart3 },
-    { label: "Wiki", path: "/docs", icon: BookOpen },
+    { label: "Live", path: "/", icon: Home },
+    { label: "Lattice", path: "/telemetry", icon: BarChart3 },
+    { label: "Mesh", path: "/feeds", icon: Rss },
+    { label: "Docs", path: "/docs", icon: BookOpen },
     { label: "System", path: "/settings", icon: Settings },
   ];
   return (
@@ -33,20 +45,30 @@ export function AppLayout({ children, container = false, className }: AppLayoutP
       {/* Sticky Header */}
       <header className={cn(
         "fixed top-0 right-0 left-20 z-[55] transition-all duration-500 border-b",
-        scrolled 
-          ? "bg-background/85 backdrop-blur-2xl border-border/10 py-3 shadow-md3-2" 
+        scrolled
+          ? "bg-background/85 backdrop-blur-2xl border-border/10 py-3 shadow-md3-2"
           : "bg-transparent border-transparent py-5"
       )}>
         <div className="max-w-7xl mx-auto px-6 md:px-12 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container-high/50 border border-border/10">
-              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_#4ade80]" />
-              <span className="text-[10px] font-mono font-black uppercase tracking-widest text-emerald-500">Mesh: Online</span>
+              <div className={cn(
+                "h-2 w-2 rounded-full transition-all duration-500",
+                syncStatus === 'stable' && "bg-emerald-500 shadow-[0_0_8px_#4ade80]",
+                syncStatus === 'syncing' && "bg-primary animate-pulse-fast shadow-[0_0_8px_hsl(var(--primary))]",
+                syncStatus === 'p2p' && "bg-blue-500 animate-bounce shadow-[0_0_8px_#3b82f6]"
+              )} />
+              <span className="text-[10px] font-mono font-black uppercase tracking-widest text-foreground/80">
+                {syncStatus === 'stable' && "SIG_STABLE"}
+                {syncStatus === 'syncing' && "SIG_SYNCING"}
+                {syncStatus === 'p2p' && "SIG_P2P_HANDSHAKE"}
+              </span>
             </div>
-            <div className="hidden lg:flex items-center gap-2 opacity-40 hover:opacity-100 transition-opacity">
-               <Wifi className="h-3 w-3" />
-               <span className="text-[9px] font-mono uppercase font-bold tracking-tighter">LV_NODE_CONNECTED</span>
-            </div>
+            {identity && (
+              <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/20 border border-white/5 opacity-60">
+                 <span className="text-[9px] font-mono uppercase font-bold tracking-tighter text-primary">SIG_ID: {identity.nodeId.slice(0, 8)}</span>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-4 md:gap-6">
             <div className="relative group hidden sm:block">
@@ -116,7 +138,7 @@ export function AppLayout({ children, container = false, className }: AppLayoutP
       )}>
         {children}
         <footer className="mt-20 py-10 border-t border-border/5 opacity-30 flex flex-col md:flex-row justify-between items-center gap-6 text-[10px] font-mono uppercase tracking-[0.2em] terminal-text">
-          <span className="font-black">ValleyHub Node v14.2.1 // SIG_STATUS: SECURE_ENCLAVE_READY</span>
+          <span className="font-black">ValleyHub Node v15.0.0 // SIG_STATUS: SECURE_ENCLAVE_READY</span>
           <div className="flex flex-wrap justify-center gap-6 md:gap-8">
             <span className="flex gap-2">LAT: <span className="text-primary font-black">40.6139</span></span>
             <span className="flex gap-2">LNG: <span className="text-primary font-black">-75.4778</span></span>

@@ -39,7 +39,7 @@ export default {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
         terminal: {
-          bg: '#050508',
+          bg: '#020205',
           green: '#4ade80',
           orange: '#f38020'
         },
@@ -112,11 +112,17 @@ export default {
           '15%': { opacity: '0.94' },
           '20%': { opacity: '0.99' },
           '100%': { opacity: '1.0' }
+        },
+        'pulse-fast': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.3' }
         }
   		},
   		animation: {
   			'scanline': 'scanline 8s linear infinite',
-  			'flicker': 'flicker 0.15s infinite'
+  			'flicker': 'flicker 0.15s infinite',
+        'spin-slow': 'spin 3s linear infinite',
+        'pulse-fast': 'pulse-fast 0.5s ease-in-out infinite'
   		}
   	}
   },

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Trash2, Rss, Globe, AlertCircle, Sparkles, Loader2, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Plus, Trash2, Rss, Globe, AlertCircle, Sparkles, Loader2, ThumbsUp, ThumbsDown, ShieldCheck } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { MASTER_FEEDS } from '@shared/master-feeds';
 import { toast } from 'sonner';
@@ -66,45 +66,45 @@ export function FeedManagementPage() {
     <AppLayout container={true}>
       <div className="space-y-12">
         <header className="space-y-4">
-          <h1 className="text-4xl font-display font-bold">Manage Feeds</h1>
-          <p className="text-muted-foreground text-lg max-w-2xl">
-            Build your personalized Lehigh Valley stream.
+          <h1 className="text-5xl font-display font-black tracking-tighter uppercase">Sentinel Grid</h1>
+          <p className="text-muted-foreground text-xl max-w-2xl font-medium opacity-80">
+            Regional Mesh configuration and Feed Quality assessments.
           </p>
         </header>
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <Card className="lg:col-span-1 h-fit shadow-soft border-none bg-card">
-            <div className="p-6 pb-0">
+          <Card className="lg:col-span-1 h-fit shadow-md3-2 border-none bg-surface-container-low rounded-4xl">
+            <div className="p-8 pb-0">
               <Button
                 onClick={handleLoadMasterFeeds}
                 disabled={isSyncing || isBulkLoading}
-                className="w-full bg-brand-orange hover:bg-brand-red-orange text-white shadow-glow mb-6 h-12 text-md font-bold"
+                className="w-full bg-primary hover:bg-brand-red-orange text-primary-foreground shadow-glow mb-6 h-14 rounded-2xl text-sm font-black uppercase tracking-widest"
               >
                 {isBulkLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Sparkles className="mr-2 h-5 w-5" />}
-                Load Master LV Feeds
+                LOAD_MASTER_LIST
               </Button>
             </div>
-            <CardHeader className="pt-0">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Plus className="h-5 w-5 text-brand-orange" /> Add Source
+            <CardHeader className="pt-0 px-8">
+              <CardTitle className="flex items-center gap-2 text-[11px] font-mono font-black uppercase tracking-[0.2em] text-muted-foreground">
+                <Plus className="h-5 w-5 text-primary" /> REGISTER_NODE
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-8 pb-8">
               <form onSubmit={handleAddFeed} className="space-y-4">
-                <Input placeholder="Feed URL (RSS/Atom)" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} className="bg-secondary/30 border-none" />
-                <Input placeholder="Category" value={category} onChange={(e) => setCategory(e.target.value)} className="bg-secondary/30 border-none" />
-                <Button type="submit" className="w-full btn-gradient h-11">Add Source</Button>
+                <Input placeholder="URL (RSS/Atom)" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} className="bg-black/20 border-border/10 h-12 rounded-xl font-mono text-xs" />
+                <Input placeholder="Category" value={category} onChange={(e) => setCategory(e.target.value)} className="bg-black/20 border-border/10 h-12 rounded-xl font-mono text-xs" />
+                <Button type="submit" className="w-full h-14 rounded-2xl font-black uppercase text-xs tracking-widest">SUBMIT_SOURCE</Button>
               </form>
             </CardContent>
           </Card>
           <div className="lg:col-span-2 space-y-6">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <Rss className="h-5 w-5 text-brand-orange" />
-              Active Subscriptions {feeds && `(${feeds.length})`}
+            <h2 className="text-xl font-black font-display uppercase tracking-widest flex items-center gap-2">
+              <Rss className="h-5 w-5 text-primary" />
+              Active_Signals {feeds && `[${feeds.length}]`}
             </h2>
             {!feeds || feeds.length === 0 ? (
-              <div className="p-16 border-2 border-dashed rounded-4xl text-center space-y-4 opacity-60">
-                <AlertCircle className="h-12 w-12 mx-auto" />
-                <p>No feeds found. Load the master list to get started!</p>
+              <div className="p-24 border-2 border-dashed rounded-4xl text-center space-y-6 opacity-40 bg-surface-container-low">
+                <AlertCircle className="h-16 w-16 mx-auto text-primary/40" />
+                <p className="text-xl font-bold">LATTICE_NULL: LOAD MASTER LIST</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -122,6 +122,14 @@ export function FeedManagementPage() {
 function FeedCard({ feed, onRemove }: { feed: any, onRemove: () => void }) {
   const [globalStats, setGlobalStats] = useState<any>(null);
   const identity = useLiveQuery(() => db.identity.toCollection().first());
+  const sigId = useMemo(() => {
+    let hash = 0;
+    for (let i = 0; i < feed.xmlUrl.length; i++) {
+      hash = ((hash << 5) - hash) + feed.xmlUrl.charCodeAt(i);
+      hash |= 0;
+    }
+    return Math.abs(hash).toString(16).substring(0, 8).toUpperCase();
+  }, [feed.xmlUrl]);
   useEffect(() => {
     let isMounted = true;
     const fetchStats = async () => {
@@ -129,62 +137,61 @@ function FeedCard({ feed, onRemove }: { feed: any, onRemove: () => void }) {
         const res = await fetch(`/api/signal/stats/${encodeURIComponent(feed.xmlUrl)}`);
         const json = await res.json();
         if (isMounted && json.success) setGlobalStats(json.data);
-      } catch (err) {
-        // Silently skip if network or proxy fails for individual stats
-        console.warn(`Could not fetch stats for ${feed.title}`, err);
-      }
+      } catch (err) {}
     };
     fetchStats();
     return () => { isMounted = false; };
-  }, [feed.xmlUrl, feed.title]);
-  const handleVote = async (score: number) => {
-    if (!identity) return;
-    try {
-      const res = await fetch('/api/signal/vote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-node-id': identity.nodeId },
-        body: JSON.stringify({ feedUrl: feed.xmlUrl, score })
-      });
-      if (res.ok) {
-        toast.success("Vote registered with mesh");
-        await db.votes.put({ feedUrl: feed.xmlUrl, lastVoted: Date.now(), score });
-      }
-    } catch (err) {
-      toast.error("Failed to vote");
-    }
-  };
+  }, [feed.xmlUrl]);
   const score = globalStats?.consensusScore ?? feed.quality;
+  const delta = Math.abs(score - feed.quality);
   return (
-    <Card className="shadow-soft border-none group relative overflow-hidden bg-card">
-      <CardHeader className="p-5 pb-2">
+    <Card className="shadow-md3-1 border-none group relative overflow-hidden bg-surface-container-low rounded-3xl transition-all hover:bg-surface-container-high hover:shadow-md3-2">
+      <div className="absolute top-4 right-4 font-mono text-[9px] font-black text-primary opacity-40 group-hover:opacity-100 transition-opacity">
+        SIG_ID: {sigId}
+      </div>
+      <CardHeader className="p-6 pb-2">
         <div className="flex justify-between items-start">
-          <Badge variant="secondary" className="mb-2 bg-muted/50 text-muted-foreground">{feed.category}</Badge>
-          <Button variant="ghost" size="icon" onClick={onRemove} className="h-8 w-8 hover:text-destructive">
+          <Badge variant="outline" className="mb-2 bg-black/20 text-muted-foreground font-mono text-[8px] uppercase tracking-widest border-border/10">{feed.category}</Badge>
+          <Button variant="ghost" size="icon" onClick={onRemove} className="h-8 w-8 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
-        <CardTitle className="text-lg truncate font-bold">{feed.title}</CardTitle>
+        <CardTitle className="text-lg truncate font-black tracking-tight">{feed.title}</CardTitle>
       </CardHeader>
-      <CardContent className="p-5 pt-2 space-y-4">
-        <div className="space-y-2">
-          <div className="flex justify-between text-[10px] uppercase font-bold text-muted-foreground">
-            <span className="flex items-center gap-1">Mesh Quality Index</span>
-            <span>{score}%</span>
+      <CardContent className="p-6 pt-2 space-y-5">
+        <div className="space-y-3">
+          <div className="flex justify-between text-[10px] uppercase font-black text-muted-foreground/60 tracking-widest">
+            <span className="flex items-center gap-1">IQS_QUALITY_INDEX</span>
+            <span className="text-primary">{score}%</span>
           </div>
-          <Progress value={score} className="h-1.5 bg-secondary" />
+          <div className="relative h-2 w-full bg-black/20 rounded-full overflow-hidden">
+             <div 
+               className="absolute top-0 left-0 h-full bg-primary/40 transition-all duration-1000" 
+               style={{ width: `${feed.quality}%` }}
+             />
+             <div 
+               className="absolute top-0 left-0 h-full bg-primary shadow-[0_0_10px_hsl(var(--primary))] transition-all duration-1000" 
+               style={{ width: `${score}%` }}
+             />
+          </div>
         </div>
         <div className="flex items-center justify-between pt-1">
-          <div className="flex gap-3 text-xs text-muted-foreground">
-            <a href={feed.htmlUrl} target="_blank" rel="noopener noreferrer" className="hover:text-brand-orange font-medium flex items-center gap-1">
-              <Globe className="h-3 w-3" /> Web
+          <div className="flex gap-4">
+            <a href={feed.htmlUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-mono font-black uppercase tracking-tighter text-muted-foreground hover:text-primary transition-colors flex items-center gap-1.5">
+              <Globe className="h-3.5 w-3.5" /> SOURCE_WEB
             </a>
+            {feed.successCount > 0 && (
+              <div className="flex items-center gap-1 text-[9px] font-mono font-black text-emerald-500 animate-pulse">
+                <ShieldCheck className="h-3 w-3" /> SIGNAL_ACTIVE
+              </div>
+            )}
           </div>
-          <div className="flex gap-1">
-            <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-emerald-500" onClick={() => handleVote(100)}>
-              <ThumbsUp className="h-3.5 w-3.5" />
+          <div className="flex gap-2">
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors">
+              <ThumbsUp className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive" onClick={() => handleVote(0)}>
-              <ThumbsDown className="h-3.5 w-3.5" />
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors">
+              <ThumbsDown className="h-4 w-4" />
             </Button>
           </div>
         </div>

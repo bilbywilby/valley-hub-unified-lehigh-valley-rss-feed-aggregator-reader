@@ -24,39 +24,39 @@
     --brand-red-orange: 19 80% 50%;
   }
   .dark {
-    --background: 240 30% 2%; /* #030305 */
+    --background: 240 30% 1.5%; /* #020205 */
     --foreground: 0 0% 98%;
     --primary: 27 91% 54%;
     --primary-foreground: 240 30% 2%;
     --primary-container: 27 91% 20%;
     --on-primary-container: 27 91% 90%;
-    --surface: 240 30% 3%;
-    --surface-variant: 240 30% 8%;
-    --surface-container-low: 240 30% 4%;
-    --surface-container: 240 30% 6%;
-    --surface-container-high: 240 30% 9%;
-    --surface-container-highest: 240 30% 12%;
-    --muted: 240 30% 6%;
+    --surface: 240 30% 2%;
+    --surface-variant: 240 30% 7%;
+    --surface-container-low: 240 30% 3%;
+    --surface-container: 240 30% 5%;
+    --surface-container-high: 240 30% 8%;
+    --surface-container-highest: 240 30% 10%;
+    --muted: 240 30% 5%;
     --muted-foreground: 240 5% 64.9%;
-    --border: 240 30% 12%;
+    --border: 240 30% 10%;
     --brand-orange: 27 91% 54%;
     --brand-red-orange: 19 80% 50%;
   }
-  * { 
+  * {
     @apply border-border;
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--primary)) transparent;
   }
-  /* Custom Scrollbar Logic */
+  /* Custom Scrollbar Logic V3 */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 4px;
+    height: 4px;
   }
   ::-webkit-scrollbar-track {
     @apply bg-transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-primary/40 rounded-full transition-colors hover:bg-primary/60;
+    @apply bg-primary/20 rounded-full transition-all hover:bg-primary/80 hover:shadow-[0_0_8px_hsl(var(--primary))];
   }
   body {
     @apply bg-background text-foreground font-sans selection:bg-primary/20 selection:text-primary;
@@ -80,13 +80,22 @@
     left: 0;
     bottom: 0;
     right: 0;
-    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.05) 50%), 
-                linear-gradient(90deg, rgba(255, 0, 0, 0.01), rgba(0, 255, 0, 0.005), rgba(0, 0, 255, 0.01));
-    background-size: 100% 3px, 2px 100%;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.08) 50%),
+                linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+    background-size: 100% 4px, 3px 100%;
     pointer-events: none;
     z-index: 50;
-    opacity: 0.15;
+    opacity: 0.2;
     animation: flicker 0.15s infinite;
+  }
+  .mesh-scan-effect {
+    background: radial-gradient(circle at center, rgba(243, 128, 32, 0.15) 0%, transparent 70%);
+    animation: scan-radar 4s ease-in-out infinite;
+  }
+  @keyframes scan-radar {
+    0% { transform: scale(0.5); opacity: 0; }
+    50% { opacity: 0.5; }
+    100% { transform: scale(2); opacity: 0; }
   }
   .nav-rail-item {
     @apply flex flex-col items-center justify-center w-full gap-1 p-2 transition-all duration-200;
