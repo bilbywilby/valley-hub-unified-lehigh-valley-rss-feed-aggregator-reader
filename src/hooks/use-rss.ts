@@ -14,7 +14,7 @@ export function useRSS() {
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 32);
   };
-  const syncFeeds = useCallback(async () => {
+  const syncFeeds = useCallback(async (force: boolean = false) => {
     if (!navigator.onLine) {
       setError('Offline: Connect to synchronize regional mesh');
       return;
@@ -30,12 +30,11 @@ export function useRSS() {
         console.log('Initializing regional master feeds...');
         const initialFeeds = MASTER_FEEDS.map(f => ({ ...f, lastFetched: undefined }));
         await db.feeds.bulkAdd(initialFeeds);
-        // Re-fetch feeds so we can continue with synchronization immediately
         feeds = await db.feeds.toArray();
       }
-      // Minimum sync interval check (except for first run)
+      // Minimum sync interval check (except for first run or forced)
       const now = Date.now();
-      if (lastSyncRef.current !== 0 && now - lastSyncRef.current < 60000) {
+      if (!force && lastSyncRef.current !== 0 && now - lastSyncRef.current < 60000) {
         setError('Mesh cooldown: Wait 1 minute between updates');
         setIsSyncing(false);
         return;
@@ -45,14 +44,15 @@ export function useRSS() {
         ignoreAttributes: false,
         attributeNamePrefix: "@_",
       });
-      // Strategy: Prioritize high-quality feeds or those never fetched
-      const feedsToSync = feeds.filter(feed => {
+      // Strategy: Prioritize high-quality feeds or those never fetched, unless forced
+      const feedsToSync = force ? feeds : feeds.filter(feed => {
         if (!feed.lastFetched) return true;
         const timeSinceLastFetch = now - new Date(feed.lastFetched).getTime();
         const threshold = feed.quality > 80 ? 3600000 : 21600000; // 1hr vs 6hr
         return timeSinceLastFetch > threshold;
-      }).slice(0, 20); // Batch limit per manual sync to prevent browser hanging
-      for (const feed of feedsToSync) {
+      });
+      const batch = feedsToSync.slice(0, 30); // Higher limit for forced sync
+      for (const feed of batch) {
         try {
           const response = await fetch(`/api/proxy?url=${encodeURIComponent(feed.xmlUrl)}`);
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -100,7 +100,6 @@ export function useRSS() {
             }
           }
           await db.feeds.update(feed.id, { lastFetched: new Date().toISOString() });
-          // Background IQS calculation
           if (identity) {
             fetch(`/api/v1/iqs/${encodeURIComponent(feed.xmlUrl)}`, {
               method: 'POST',
@@ -110,7 +109,7 @@ export function useRSS() {
         } catch (e) {
           console.warn(`Mesh signal lost for ${feed.title}:`, e);
         }
-        await new Promise(r => setTimeout(r, 100)); // Rate limit spacing
+        await new Promise(r => setTimeout(r, 50)); // Faster spacing for UX
       }
       if (discoveredArticles.length > 0 && identity) {
         await fetch('/api/signal/ingest', {

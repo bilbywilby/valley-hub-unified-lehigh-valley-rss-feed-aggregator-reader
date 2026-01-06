@@ -48,7 +48,7 @@ export function FeedManagementPage() {
     setIsBulkLoading(true);
     try {
       await db.feeds.clear();
-      await db.articles.clear();
+      await db.clearNonBookmarkedArticles();
       await db.feeds.bulkAdd(MASTER_FEEDS);
       toast.success(`Lehigh Valley Master List loaded!`);
       syncFeeds();

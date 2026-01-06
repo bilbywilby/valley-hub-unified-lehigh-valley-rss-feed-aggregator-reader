@@ -12,13 +12,19 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 export function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const articles = useLiveQuery(() => db.articles.orderBy('pubDate').reverse().limit(100).toArray());
   const feedsCount = useLiveQuery(() => db.feeds.count()) ?? 0;
-  const { syncFeeds, isSyncing } = useRSS();
+  const { syncFeeds, isSyncing, error } = useRSS();
   const [bootSequence, setBootSequence] = useState<string[]>([]);
   const hasBooted = useRef(false);
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+    }
+  }, [error]);
   useEffect(() => {
     if (hasBooted.current) return;
     hasBooted.current = true;
@@ -27,7 +33,7 @@ export function HomePage() {
       "> Checking cryptographic identity...",
       "> Found NodeID: verifying secure enclave...",
       "> Reconciling regional master feeds [142 sources]...",
-      "> Bootstrapping local article cache...",
+      articles && articles.length > 0 ? "> Local cache verified: regional data ready." : "> Local cache empty: mesh sync required.",
       "> Mesh integrity verified. System ready."
     ];
     logs.forEach((log, i) => {
@@ -38,7 +44,7 @@ export function HomePage() {
     if (feedsCount === 0) {
       setTimeout(() => syncFeeds(), 3000);
     }
-  }, [feedsCount, syncFeeds]);
+  }, [feedsCount, syncFeeds, articles]);
   const filteredArticles = useMemo(() => {
     if (!articles) return [];
     if (!searchQuery) return articles;
@@ -66,7 +72,7 @@ export function HomePage() {
               </p>
               <div className="flex flex-wrap gap-4 pt-4">
                 <Button
-                  onClick={() => syncFeeds()}
+                  onClick={() => syncFeeds(true)}
                   disabled={isSyncing}
                   className="rounded-full bg-primary h-14 px-8 font-black uppercase text-xs tracking-widest shadow-glow active:scale-95 transition-all"
                 >

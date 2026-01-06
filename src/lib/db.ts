@@ -58,6 +58,18 @@ export class ValleyHubDB extends Dexie {
     });
   }
   /**
+   * Clears all articles that are NOT bookmarked.
+   */
+  async clearNonBookmarkedArticles() {
+    return this.transaction('rw', this.articles, async () => {
+      const nonBookmarkedKeys = await this.articles
+        .where('isBookmarked')
+        .notEqual(true)
+        .primaryKeys();
+      await this.articles.bulkDelete(nonBookmarkedKeys);
+    });
+  }
+  /**
    * Prunes articles older than 24 hours (unless bookmarked)
    * and telemetry older than 48 hours if synced.
    */
@@ -68,13 +80,13 @@ export class ValleyHubDB extends Dexie {
       // Prune old non-bookmarked articles
       const oldArticles = await this.articles
         .where('pubDate').below(new Date(oneDayAgo).toISOString())
-        .and(a => !a.isBookmarked)
+        .filter(a => !a.isBookmarked)
         .primaryKeys();
       await this.articles.bulkDelete(oldArticles);
       // Prune synced telemetry older than 48h
       const oldTelemetry = await this.telemetry
         .where('timestamp').below(twoDaysAgo)
-        .and(t => t.synced === 1)
+        .filter(t => t.synced === 1)
         .primaryKeys();
       await this.telemetry.bulkDelete(oldTelemetry);
     });
