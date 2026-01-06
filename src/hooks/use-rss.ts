@@ -11,6 +11,8 @@ export function useRSS() {
     setError(null);
     try {
       const feeds = await db.feeds.toArray();
+      if (feeds.length === 0) return;
+
       const parser = new XMLParser({
         ignoreAttributes: false,
         attributeNamePrefix: "@_",
@@ -52,6 +54,8 @@ export function useRSS() {
         } catch (e) {
           console.error(`Failed to fetch feed ${feed.title}:`, e);
         }
+        // Small breather to keep UI responsive during massive sync
+        await new Promise(resolve => setTimeout(resolve, 50));
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown sync error');

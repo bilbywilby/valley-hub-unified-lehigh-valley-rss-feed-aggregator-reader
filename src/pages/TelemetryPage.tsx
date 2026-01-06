@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, Title, AreaChart, BarChart, Text, Metric, Flex, Badge } from '@tremor/react';
 import { Activity, Zap, Newspaper, Rss } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { subDays, format, startOfDay } from 'date-fns';
 export function TelemetryPage() {
   const articles = useLiveQuery(() => db.articles.toArray());
@@ -30,7 +31,7 @@ export function TelemetryPage() {
     return Object.entries(counts)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+      .slice(0, 10);
   }, [articles]);
   return (
     <AppLayout container={true}>
@@ -94,7 +95,8 @@ export function TelemetryPage() {
         </div>
         <Card className="border-none shadow-soft">
           <Title>Feed Quality Index</Title>
-          <div className="mt-6 space-y-4">
+          <ScrollArea className="h-96 mt-6 pr-4">
+            <div className="space-y-4">
             {feeds?.map(feed => (
               <div key={feed.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-xl">
                 <div className="flex items-center gap-3">
@@ -108,6 +110,7 @@ export function TelemetryPage() {
               </div>
             ))}
           </div>
+          </ScrollArea>
         </Card>
       </div>
     </AppLayout>

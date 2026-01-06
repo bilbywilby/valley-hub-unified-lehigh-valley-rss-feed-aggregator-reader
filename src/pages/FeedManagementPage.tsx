@@ -7,19 +7,40 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Trash2, Rss, Globe, ExternalLink, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Rss, Globe, ExternalLink, AlertCircle, Sparkles, RefreshCcw } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import { MASTER_FEEDS } from '@shared/master-feeds';
+import { toast } from 'sonner';
+import { useRSS } from '@/hooks/use-rss';
+
 export function FeedManagementPage() {
   const [newUrl, setNewUrl] = useState('');
   const [category, setCategory] = useState('News');
   const feeds = useLiveQuery(() => db.feeds.toArray());
+  const { syncFeeds, isSyncing } = useRSS();
+
   const handleAddFeed = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUrl) return;
+    
+    const existing = await db.feeds.where('xmlUrl').equals(newUrl).first();
+    if (existing) {
+      toast.error("Feed already exists");
+      return;
+    }
+
     const id = uuidv4();
+    let title = "New Source";
+    try {
+      title = new URL(newUrl).hostname;
+    } catch (e) {
+      toast.error("Invalid URL");
+      return;
+    }
+
     await db.feeds.add({
       id,
-      title: new URL(newUrl).hostname,
+      title,
       xmlUrl: newUrl,
       htmlUrl: new URL(newUrl).origin,
       category,
@@ -28,11 +49,26 @@ export function FeedManagementPage() {
     });
     setNewUrl('');
   };
+
+  const handleLoadMasterFeeds = async () => {
+    if (!confirm("This will clear your current subscriptions and articles to load the Lehigh Valley Master List (~120 sources). Continue?")) {
+      return;
+    }
+    try {
+      await db.feeds.clear();
+      await db.articles.clear();
+      await db.feeds.bulkAdd(MASTER_FEEDS);
+      toast.success(`Success! Loaded ${MASTER_FEEDS.length} regional feeds.`);
+      syncFeeds();
+    } catch (err) {
+      toast.error("Failed to load master feeds");
+    }
+  };
+
   const removeFeed = async (id: string) => {
     await db.feeds.delete(id);
     await db.articles.where('feedUrl').equals(id).delete();
-  };
-  return (
+  };  return (
     <AppLayout container={true}>
       <div className="space-y-12">
         <header className="space-y-4">
@@ -43,6 +79,24 @@ export function FeedManagementPage() {
         </header>
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <Card className="lg:col-span-1 h-fit shadow-soft border-none bg-card">
+            <div className="p-6 pb-0">
+              <Button 
+                onClick={handleLoadMasterFeeds} 
+                disabled={isSyncing}
+                className="w-full bg-brand-orange hover:bg-brand-red-orange text-white shadow-glow mb-6 h-12 text-md font-bold"
+              >
+                {isSyncing ? (
+                  <RefreshCcw className="mr-2 h-5 w-5 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-2 h-5 w-5" />
+                )}
+                Load Master LV Feeds
+              </Button>
+              <div className="relative mb-6">
+                <div className="absolute inset-0 flex items-center"><span className="w-full border-t"></span></div>
+                <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">Or add custom</span></div>
+              </div>
+            </div>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Plus className="h-5 w-5 text-brand-orange" /> Add New Source
