@@ -34,8 +34,8 @@ export function useRSS() {
       }
       // Minimum sync interval check (except for first run or forced)
       const now = Date.now();
-      if (!force && lastSyncRef.current !== 0 && now - lastSyncRef.current < 60000) {
-        setError('Mesh cooldown: Wait 1 minute between updates');
+      if (!force && lastSyncRef.current !== 0 && now - lastSyncRef.current < 30000) {
+        setError('Sync cooldown 30s');
         setIsSyncing(false);
         return;
       }
@@ -46,6 +46,7 @@ export function useRSS() {
       });
       // Strategy: Prioritize high-quality feeds or those never fetched, unless forced
       const feedsToSync = force ? feeds : feeds.filter(feed => {
+        if (feed.quality <= 0) return false;
         if (!feed.lastFetched) return true;
         const timeSinceLastFetch = now - new Date(feed.lastFetched).getTime();
         const threshold = feed.quality > 80 ? 3600000 : 21600000; // 1hr vs 6hr
@@ -99,7 +100,18 @@ export function useRSS() {
               discoveredArticles.push(article);
             }
           }
-          await db.feeds.update(feed.id, { lastFetched: new Date().toISOString() });
+          if (normalizedItems.length > 0 && feed.id) {
+            await db.feeds.update(feed.id, {
+              quality: Math.min(100, (feed.quality || 0) + 2),
+              lastFetched: new Date().toISOString(),
+              successCount: (feed.successCount || 0) + 1
+            });
+          } else if (feed.id) {
+            await db.feeds.update(feed.id, {
+              quality: Math.max(0, (feed.quality || 0) - 1),
+              lastFetched: new Date().toISOString()
+            });
+          }
           if (identity) {
             fetch(`/api/v1/iqs/${encodeURIComponent(feed.xmlUrl)}`, {
               method: 'POST',
@@ -107,7 +119,15 @@ export function useRSS() {
             }).catch(() => {});
           }
         } catch (e) {
-          console.warn(`Mesh signal lost for ${feed.title}:`, e);
+          console.debug(`Feed failed ${feed.title}: ${e.message}`);
+          if (feed.id) {
+            const newQuality = Math.max(0, (feed.quality || 0) - 10);
+            await db.feeds.update(feed.id, {
+              quality: newQuality,
+              lastFailed: new Date().toISOString(),
+              failCount: (feed.failCount || 0) + 1
+            });
+          }
         }
         await new Promise(r => setTimeout(r, 50)); // Faster spacing for UX
       }

@@ -80,8 +80,11 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         if(!url || !url.startsWith('http')) {
             return c.json({success:false, error:'Valid URL query param required'},400);
         }
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
         try {
-            const res = await fetch(url, {headers:{'User-Agent':'ValleyHub-RSS-Proxy/1.0 (+https://valleyhub.app)'}});
+            const res = await fetch(url, { signal: controller.signal, headers:{'User-Agent':'ValleyHub-RSS-Proxy/1.0 (+https://valleyhub.app)'} });
+            clearTimeout(timeoutId);
             if(!res.ok) {
                 console.warn(`Proxy failed ${res.status} for ${url}`);
                 return new Response(`RSS Proxy Error: ${res.status} ${res.statusText}`, {
@@ -89,15 +92,21 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
                     headers:{'Content-Type':'text/plain'}
                 });
             }
+            const ct = res.headers.get('content-type') || '';
+            if (!ct.match(/xml|rss/i)) {
+                throw new Error(`Invalid Content-Type: ${ct}`);
+            }
             const headers = new Headers(res.headers);
+            headers.delete('content-length');
+            headers.delete('content-encoding');
             headers.set('Cache-Control','public, max-age=900, s-maxage=900');
-            headers.delete('Content-Encoding');
-            headers.append('Access-Control-Allow-Origin','*');
-            headers.append('X-Proxy-Source',url);
-            return new Response(res.body, {status:res.status, headers});
+            headers.set('Access-Control-Allow-Origin','*');
+            headers.set('X-Proxy-Source',url);
+            return new Response(res.body!, {status: res.status, headers});
         } catch(err:any) {
-            console.error('Proxy error:',err);
-            return c.json({success:false,error:`Proxy failed: ${err.message}`},500);
+            clearTimeout(timeoutId);
+            console.warn(`Proxy failed ${url}:`, err.message);
+            return new Response(`Proxy Error: ${err.message}`, {status: 502, headers: {'Content-Type': 'text/plain'}});
         }
     });
     app.post('/api/telemetry', async (c) => {
