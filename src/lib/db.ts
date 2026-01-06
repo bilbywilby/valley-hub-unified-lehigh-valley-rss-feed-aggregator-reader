@@ -1,4 +1,4 @@
-import Dexie, { type Table, subDays } from 'dexie';
+import Dexie, { type Table } from 'dexie';
 import type { Article, Feed } from '@shared/types';
 export interface AppConfig {
   key: string;
@@ -49,17 +49,14 @@ export class ValleyHubDB extends Dexie {
     this.version(3).stores({
       votes: 'feedUrl, lastVoted'
     });
-    // CRITICAL: Handle multi-tab schema upgrades gracefully
     this.on('versionchange', () => {
       console.warn('Another connection wants to upgrade the database. Closing now.');
       this.close();
-      // Optional: reload to pick up new schema
       if (typeof window !== 'undefined') {
         window.location.reload();
       }
     });
   }
-
   /**
    * Prunes articles older than 24 hours (unless bookmarked)
    * and telemetry older than 48 hours if synced.
@@ -67,7 +64,6 @@ export class ValleyHubDB extends Dexie {
   async pruneOldData() {
     const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
     const twoDaysAgo = Date.now() - (48 * 60 * 60 * 1000);
-
     return this.transaction('rw', [this.articles, this.telemetry], async () => {
       // Prune old non-bookmarked articles
       const oldArticles = await this.articles
@@ -75,9 +71,11 @@ export class ValleyHubDB extends Dexie {
         .and(a => !a.isBookmarked)
         .primaryKeys();
       await this.articles.bulkDelete(oldArticles);
-
       // Prune synced telemetry older than 48h
-      const oldTelemetry = await this.telemetry.where('timestamp').below(twoDaysAgo).and(t => t.synced === 1).primaryKeys();
+      const oldTelemetry = await this.telemetry
+        .where('timestamp').below(twoDaysAgo)
+        .and(t => t.synced === 1)
+        .primaryKeys();
       await this.telemetry.bulkDelete(oldTelemetry);
     });
   }
