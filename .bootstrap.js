@@ -77,7 +77,16 @@ function updateWranglerJsonc() {
 }
 
 function runSetupCommands() {
-    const commands = [];
+    const commands = [
+    "bun add dexie@^4.0.2",
+    "bun add fast-xml-parser@^4.4.1",
+    "bun add react-parallax@^1.5.6",
+    "bun add @tremor/react@^2.3.1",
+    "bun add react-intersection-observer@^9.2.0",
+    "bun add react-icons@^5.3.0",
+    "bun add swiper@^11.1.14",
+    "bun add react-markdown@^9.0.1"
+];
     
     if (commands.length === 0) {
         console.log('⊘ No setup commands to run');
