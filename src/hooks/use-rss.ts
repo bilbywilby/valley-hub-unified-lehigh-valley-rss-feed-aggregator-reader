@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { XMLParser } from 'fast-xml-parser';
 import { db } from '@/lib/db';
-import type { Article } from '@shared/types';
+import type { Article, Feed } from '@shared/types';
 import { v4 as uuidv4 } from 'uuid';
 import { MASTER_FEEDS } from '@shared/master-feeds';
 export function useRSS() {
@@ -23,32 +23,35 @@ export function useRSS() {
     setError(null);
     const discoveredArticles: Article[] = [];
     try {
-      const feeds = await db.feeds.toArray();
+      let feeds = await db.feeds.toArray();
       const identity = await db.identity.toCollection().first();
-      // Minimum sync interval of 2 minutes to prevent rate limiting
-      if (Date.now() - lastSyncRef.current < 120000) {
-        setError('Mesh cooldown: Wait 2 minutes between global updates');
-        setIsSyncing(false);
-        return;
-      }
-      lastSyncRef.current = Date.now();
+      // Population phase if empty
       if (feeds.length === 0) {
-        await db.feeds.bulkAdd(MASTER_FEEDS.map(f => ({...f, lastFetched: undefined})));
+        console.log('Initializing regional master feeds...');
+        const initialFeeds = MASTER_FEEDS.map(f => ({ ...f, lastFetched: undefined }));
+        await db.feeds.bulkAdd(initialFeeds);
+        // Re-fetch feeds so we can continue with synchronization immediately
+        feeds = await db.feeds.toArray();
+      }
+      // Minimum sync interval check (except for first run)
+      const now = Date.now();
+      if (lastSyncRef.current !== 0 && now - lastSyncRef.current < 60000) {
+        setError('Mesh cooldown: Wait 1 minute between updates');
         setIsSyncing(false);
         return;
       }
+      lastSyncRef.current = now;
       const parser = new XMLParser({
         ignoreAttributes: false,
         attributeNamePrefix: "@_",
       });
-      // Filter feeds that need sync based on quality and last update
+      // Strategy: Prioritize high-quality feeds or those never fetched
       const feedsToSync = feeds.filter(feed => {
         if (!feed.lastFetched) return true;
-        const timeSinceLastFetch = Date.now() - new Date(feed.lastFetched).getTime();
-        // High quality feeds sync more frequently
+        const timeSinceLastFetch = now - new Date(feed.lastFetched).getTime();
         const threshold = feed.quality > 80 ? 3600000 : 21600000; // 1hr vs 6hr
         return timeSinceLastFetch > threshold;
-      });
+      }).slice(0, 20); // Batch limit per manual sync to prevent browser hanging
       for (const feed of feedsToSync) {
         try {
           const response = await fetch(`/api/proxy?url=${encodeURIComponent(feed.xmlUrl)}`);
@@ -67,12 +70,10 @@ export function useRSS() {
               link = alternate["@_href"] || alternate;
             } else if (item.link?.["@_href"]) {
               link = item.link["@_href"];
-            } else if (item.guid?.["#text"]) {
-              link = item.guid["#text"];
             }
             const description = item.description || item.summary?.["#text"] || item.summary || item.content?.["#text"] || item.content || '';
             let pubDate = new Date().toISOString();
-            const rawDate = item.pubDate || item.published || item.updated || item["dc:date"];
+            const rawDate = item.pubDate || item.published || item.updated;
             if (rawDate) {
               const parsed = new Date(rawDate);
               if (!isNaN(parsed.getTime())) pubDate = parsed.toISOString();
@@ -81,8 +82,8 @@ export function useRSS() {
             return {
               id: uuidv4(),
               hash,
-              title: typeof title === 'string' ? title : String(title),
-              link: typeof link === 'string' ? link : String(link),
+              title: String(title),
+              link: String(link),
               description: typeof description === 'string' ? description : (description?.["#text"] || ''),
               pubDate,
               feedUrl: feed.xmlUrl,
@@ -98,39 +99,25 @@ export function useRSS() {
               discoveredArticles.push(article);
             }
           }
-          if (feed.id) {
-            await db.feeds.update(feed.id, { lastFetched: new Date().toISOString() });
-            // Trigger IQS calculation in background via mesh API
-            fetch(`/api/v1/iqs/${encodeURIComponent(feed.xmlUrl)}`, { 
+          await db.feeds.update(feed.id, { lastFetched: new Date().toISOString() });
+          // Background IQS calculation
+          if (identity) {
+            fetch(`/api/v1/iqs/${encodeURIComponent(feed.xmlUrl)}`, {
               method: 'POST',
-              headers: identity ? { 'x-node-id': identity.nodeId } : {}
-            })
-            .then(res => res.json())
-            .then(json => {
-              if (json.success && json.data?.quality !== undefined) {
-                db.feeds.update(feed.id, { quality: json.data.quality });
-              }
-            })
-            .catch(() => {/* Background task: fail silently */});
+              headers: { 'x-node-id': identity.nodeId }
+            }).catch(() => {});
           }
         } catch (e) {
           console.warn(`Mesh signal lost for ${feed.title}:`, e);
-          if (feed.id) {
-            await db.feeds.update(feed.id, { lastFetched: new Date().toISOString(), quality: Math.max(0, (feed.quality || 50) - 5) });
-          }
         }
-        // Strict rate limit respect: 200ms between sources
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise(r => setTimeout(r, 100)); // Rate limit spacing
       }
       if (discoveredArticles.length > 0 && identity) {
         await fetch('/api/signal/ingest', {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'x-node-id': identity.nodeId
-          },
+          headers: { 'Content-Type': 'application/json', 'x-node-id': identity.nodeId },
           body: JSON.stringify(discoveredArticles.slice(0, 50))
-        }).catch(() => {/* Best effort ingestion */});
+        }).catch(() => {});
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Mesh synchronization failed');
