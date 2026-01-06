@@ -17,6 +17,22 @@ import { ArticleDetailPage } from '@/pages/ArticleDetailPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { TelemetryPage } from '@/pages/TelemetryPage'
 const queryClient = new QueryClient();
+
+// Register Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.ts', { type: 'module' })
+      .then(registration => {
+        console.log('SW registered: ', registration);
+        // Trigger a prune on startup
+        registration.active?.postMessage({ type: 'PRUNE_DATA' });
+      })
+      .catch(registrationError => {
+        console.log('SW registration failed: ', registrationError);
+      });
+  });
+}
+
 const router = createBrowserRouter([
   {
     path: "/",
