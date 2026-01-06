@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Network, Database, RefreshCcw, Hash, Clock, ShieldCheck } from 'lucide-react';
+import { Activity, Database, RefreshCcw, Hash, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
@@ -92,7 +92,6 @@ export function HomePage() {
   const feedsCount = useLiveQuery(() => db.feeds.count()) ?? 0;
   const { syncFeeds, isSyncing, error } = useRSS();
   const [bootSequence, setBootSequence] = useState<string[]>([]);
-
   // Discovery Announcement Lifecycle
   useEffect(() => {
     const announce = async () => {
@@ -104,15 +103,16 @@ export function HomePage() {
           method: 'POST',
           body: JSON.stringify({ nodeId: identity.nodeId, coords: jittered })
         });
-        setLogs(prev => [...prev, `> SIGNAL_ANNOUNCE: [${identity.nodeId.slice(0,8)}] broadcasted`].slice(-6));
-      } catch (e) {}
+        setBootSequence(prev => [...prev, `> SIGNAL_ANNOUNCE: [${identity.nodeId.slice(0, 8)}] broadcasted`].slice(-5));
+      } catch (err) {
+        // Silently fail if announcement fails - non-critical mesh signaling
+        console.warn('Mesh announcement failed', err);
+      }
     };
-
     announce();
     const interval = setInterval(announce, 300000); // 5 mins
     return () => clearInterval(interval);
   }, []);
-
   const hasBooted = useRef(false);
   useEffect(() => {
     if (error) toast.error(error);

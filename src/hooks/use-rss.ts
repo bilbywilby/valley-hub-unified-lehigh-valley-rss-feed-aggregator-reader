@@ -27,12 +27,11 @@ export function useRSS() {
       const identity = await db.identity.toCollection().first();
       // Population phase if empty
       if (feeds.length === 0) {
-        console.log('Initializing regional master feeds...');
         const initialFeeds = MASTER_FEEDS.map(f => ({ ...f, lastFetched: undefined }));
         await db.feeds.bulkAdd(initialFeeds);
         feeds = await db.feeds.toArray();
       }
-      // Minimum sync interval check (except for first run or forced)
+      // Minimum sync interval check
       const now = Date.now();
       if (!force && lastSyncRef.current !== 0 && now - lastSyncRef.current < 30000) {
         setError('Sync cooldown 30s');
@@ -44,10 +43,17 @@ export function useRSS() {
         ignoreAttributes: false,
         attributeNamePrefix: "@_",
       });
-      // Strategy: Prioritize high-quality feeds or those never fetched, unless forced
-      const feedsToSync = force ? feeds.filter(feed => feed.quality > 50 && (!feed.lastFailed || (!isNaN(new Date(feed.lastFailed).getTime()) && now - new Date(feed.lastFailed).getTime() >= 86400000))) : feeds.filter(feed => { if(feed.quality <= 50) return false; if(feed.lastFailed && !isNaN(new Date(feed.lastFailed).getTime()) && (now - new Date(feed.lastFailed).getTime() < 86400000)) return false; if(!feed.lastFetched) return true; const lastFetchedTime = feed.lastFetched && !isNaN(new Date(feed.lastFetched).getTime()) ? new Date(feed.lastFetched).getTime() : 0; const timeSinceLastFetch = now - lastFetchedTime; const threshold = feed.quality > 80 ? 3600000 : 21600000; return timeSinceLastFetch > threshold; });
+      const feedsToSync = force 
+        ? feeds.filter(f => f.quality > 50) 
+        : feeds.filter(f => {
+            if (f.quality <= 50) return false;
+            const lastFetchedTime = f.lastFetched ? new Date(f.lastFetched).getTime() : 0;
+            const threshold = f.quality > 80 ? 3600000 : 21600000;
+            return (now - lastFetchedTime) > threshold;
+          });
       const batch = feedsToSync.slice(0, force ? 30 : 20);
       for (const feed of batch) {
+        if (!feed.id) continue;
         try {
           const response = await fetch(`/api/v1/sentinel/proxy?url=${encodeURIComponent(feed.xmlUrl)}`);
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -73,7 +79,7 @@ export function useRSS() {
               const parsed = new Date(rawDate);
               if (!isNaN(parsed.getTime())) pubDate = parsed.toISOString();
             }
-            const hash = await generateSafeHash(title + link);
+            const hash = await generateSafeHash(String(title) + String(link));
             return {
               id: uuidv4(),
               hash,
@@ -94,18 +100,11 @@ export function useRSS() {
               discoveredArticles.push(article);
             }
           }
-          if (normalizedItems.length > 0 && feed.id) {
-            await db.feeds.update(feed.id, {
-              quality: Math.min(100, (feed.quality || 0) + 2),
-              lastFetched: new Date().toISOString(),
-              successCount: (feed.successCount || 0) + 1
-            });
-          } else if (feed.id) {
-            await db.feeds.update(feed.id, {
-              quality: Math.max(0, (feed.quality || 0) - 1),
-              lastFetched: new Date().toISOString()
-            });
-          }
+          await db.feeds.update(feed.id, {
+            quality: Math.min(100, (feed.quality || 0) + 1),
+            lastFetched: new Date().toISOString(),
+            successCount: (feed.successCount || 0) + 1
+          });
           if (identity) {
             fetch(`/api/v1/iqs/${encodeURIComponent(feed.xmlUrl)}`, {
               method: 'POST',
@@ -113,17 +112,14 @@ export function useRSS() {
             }).catch(() => {});
           }
         } catch (e) {
-          console.debug(`Feed failed ${feed.title}: ${e.message}`);
-          if (feed.id) {
-            const newQuality = Math.max(0, (feed.quality || 0) - 10);
-            await db.feeds.update(feed.id, {
-              quality: newQuality,
-              lastFailed: new Date().toISOString(),
-              failCount: (feed.failCount || 0) + 1
-            });
-          }
+          console.error(`[MESH DIAGNOSTIC] Feed failure [${feed.title}]:`, e);
+          await db.feeds.update(feed.id, {
+            quality: Math.max(0, (feed.quality || 0) - 5),
+            lastFailed: new Date().toISOString(),
+            failCount: (feed.failCount || 0) + 1
+          });
         }
-        await new Promise(r => setTimeout(r, 50)); // Faster spacing for UX
+        await new Promise(r => setTimeout(r, 50));
       }
       if (discoveredArticles.length > 0 && identity) {
         await fetch('/api/signal/ingest', {
@@ -133,7 +129,7 @@ export function useRSS() {
         }).catch(() => {});
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Mesh synchronization failed');
+      setError(e instanceof Error ? e.message : 'Mesh synchronization failure');
     } finally {
       setIsSyncing(false);
     }

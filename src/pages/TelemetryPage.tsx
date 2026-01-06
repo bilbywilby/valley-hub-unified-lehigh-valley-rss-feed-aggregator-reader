@@ -6,20 +6,25 @@ import { Card, Title, AreaChart, BarChart, Text, Metric, Flex, Badge as TremorBa
 import { Badge as ShadcnBadge } from '@/components/ui/badge';
 import { Activity, Zap, Newspaper, Rss, ShieldCheck, Globe } from 'lucide-react';
 import { subDays, format } from 'date-fns';
-import { cn } from '@/lib/utils';
 export function TelemetryPage() {
   const articles = useLiveQuery(() => db.articles.toArray());
   const feeds = useLiveQuery(() => db.feeds.toArray());
   const chartData = useMemo(() => {
-    if (!articles) return [];
+    if (!articles || articles.length === 0) return [];
     const last7Days = Array.from({ length: 7 }, (_, i) => format(subDays(new Date(), i), 'MMM dd')).reverse();
     return last7Days.map(day => ({
       date: day,
-      "Mesh Processing Volume": articles.filter(a => format(new Date(a.pubDate), 'MMM dd') === day).length
+      "Mesh Processing Volume": articles.filter(a => {
+        try {
+          return format(new Date(a.pubDate), 'MMM dd') === day;
+        } catch (e) {
+          return false;
+        }
+      }).length
     }));
   }, [articles]);
   const sourceData = useMemo(() => {
-    if (!articles) return [];
+    if (!articles || articles.length === 0) return [];
     const counts: Record<string, number> = {};
     articles.forEach(a => {
       counts[a.sourceName] = (counts[a.sourceName] || 0) + 1;
@@ -141,21 +146,27 @@ export function TelemetryPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {feeds?.slice(0, 20).map((item) => (
-                <TableRow key={item.id} className="hover:bg-primary/5 transition-all group">
-                  <TableCell className="px-8 py-5">
-                    <Text className="font-bold text-foreground group-hover:text-primary transition-colors">{item.title}</Text>
-                  </TableCell>
-                  <TableCell className="px-8 py-5">
-                    <TremorBadge color={item.quality > 90 ? "emerald" : "orange"} className="font-mono text-[9px] uppercase font-black tracking-tighter">
-                      {item.category} // SECURE_SHARD
-                    </TremorBadge>
-                  </TableCell>
-                  <TableCell className="text-right px-8 py-5">
-                    <Text className="font-terminal font-black text-primary text-lg tracking-tighter">{item.quality}.00%</Text>
-                  </TableCell>
+              {feeds && feeds.length > 0 ? (
+                feeds.slice(0, 20).map((item) => (
+                  <TableRow key={item.id} className="hover:bg-primary/5 transition-all group">
+                    <TableCell className="px-8 py-5">
+                      <Text className="font-bold text-foreground group-hover:text-primary transition-colors">{item.title}</Text>
+                    </TableCell>
+                    <TableCell className="px-8 py-5">
+                      <TremorBadge color={item.quality > 90 ? "emerald" : "orange"} className="font-mono text-[9px] uppercase font-black tracking-tighter">
+                        {item.category} // SECURE_SHARD
+                      </TremorBadge>
+                    </TableCell>
+                    <TableCell className="text-right px-8 py-5">
+                      <Text className="font-terminal font-black text-primary text-lg tracking-tighter">{item.quality}.00%</Text>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center py-10 opacity-50 font-mono text-xs uppercase">Awaiting Mesh Population...</TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </Card>
