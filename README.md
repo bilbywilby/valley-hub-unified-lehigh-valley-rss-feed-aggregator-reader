@@ -1,6 +1,6 @@
 # Valley Hub
 
-[cloudflarebutton]
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/bilbywilby/valley-hub-unified-lehigh-valley-rss-feed-aggregator-reader)
 
 A production-ready full-stack application template powered by Cloudflare Workers, featuring a reactive frontend with React, Vite, Shadcn UI, and Tailwind CSS, paired with a robust Hono-based API backend utilizing Durable Objects for persistent state management.
 
@@ -90,7 +90,7 @@ Or manually:
 2. Deploy: `wrangler deploy`
 3. Pages: `wrangler pages deploy dist --project-name=<pages-project>`
 
-[cloudflarebutton]
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/bilbywilby/valley-hub-unified-lehigh-valley-rss-feed-aggregator-reader)
 
 Configure `wrangler.jsonc` with your account ID and secrets as needed.
 
